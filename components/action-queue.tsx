@@ -72,7 +72,7 @@ export function ActionQueue({ items }: { items: ActionItem[] }) {
           <div
             key={`${item.kind}-${a.id}`}
             className={cn(
-              "group relative flex flex-wrap items-center gap-x-4 gap-y-3 overflow-hidden rounded-2xl border bg-card p-4 transition-colors sm:flex-nowrap",
+              "group relative flex flex-wrap items-center gap-x-4 gap-y-3 overflow-hidden rounded-2xl border bg-card p-4 transition-colors animate-in fade-in slide-in-from-bottom-1 duration-300 sm:flex-nowrap motion-reduce:animate-none",
               red
                 ? "border-[#fb547340] hover:border-[#fb547366]"
                 : "border-hairline hover:border-white/12",

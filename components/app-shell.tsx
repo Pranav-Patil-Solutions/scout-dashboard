@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { useEffect, useState, type ComponentType } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useRef, useState, type ComponentType } from "react";
 import {
   BarChart3,
   Columns3,
@@ -98,6 +98,9 @@ function NavLinks({
               )}
             />
             <span className="flex-1 font-medium">{item.label}</span>
+            <kbd className="hidden font-mono text-[10px] tracking-wide text-ink-3 opacity-0 transition-opacity group-hover:opacity-70 lg:inline">
+              {item.chord}
+            </kbd>
             {badge > 0 && (
               <span
                 className={cn(
@@ -175,18 +178,35 @@ export function AppShell({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const router = useRouter();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const chordArmedAt = useRef(0);
 
   // Close the mobile drawer whenever the route changes.
   useEffect(() => {
     setMobileOpen(false);
   }, [pathname]);
 
-  // Keyboard: N = new application, / = search (§9). More chords land in Phase 6.
+  // Keyboard: N = new application, / = search, G-chords navigate (Phase 6):
+  // G C command · G P board · G A insights · G I scout inbox · G E email sync.
   useEffect(() => {
+    const CHORD_WINDOW_MS = 1200;
+    const chordTargets: Record<string, string> = { c: "/", p: "/pipeline", a: "/analytics", i: "/triage", e: "/inbox-sync" };
     function onKey(e: KeyboardEvent) {
       if (e.metaKey || e.ctrlKey || e.altKey || isTypingTarget(e.target)) return;
-      if (e.key === "n" || e.key === "N") {
+      const key = e.key.toLowerCase();
+      if (chordArmedAt.current && Date.now() - chordArmedAt.current < CHORD_WINDOW_MS) {
+        chordArmedAt.current = 0;
+        const target = chordTargets[key];
+        if (target) {
+          e.preventDefault();
+          router.push(target);
+          return;
+        }
+      }
+      if (key === "g") {
+        chordArmedAt.current = Date.now();
+      } else if (key === "n") {
         e.preventDefault();
         openNewApplication();
       } else if (e.key === "/") {
@@ -196,7 +216,7 @@ export function AppShell({
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, []);
+  }, [router]);
 
   const section = NAV.find((n) => isActive(pathname, n.href))?.label ?? "Scout Control";
 

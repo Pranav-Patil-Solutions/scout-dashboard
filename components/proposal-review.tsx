@@ -75,7 +75,7 @@ export function ProposalCard({ item }: { item: PendingProposal }) {
   }
 
   return (
-    <div className="group rounded-2xl border border-hairline bg-card p-4 transition-colors hover:border-white/12">
+    <div className="group rounded-2xl border border-hairline bg-card p-4 transition-colors animate-in fade-in slide-in-from-bottom-1 duration-300 hover:border-white/12 motion-reduce:animate-none">
       <div className="flex flex-wrap items-start gap-3">
         <span
           className="grid size-9 shrink-0 place-items-center rounded-xl"

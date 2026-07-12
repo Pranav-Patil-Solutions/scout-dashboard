@@ -19,6 +19,7 @@ import {
 import { toast } from "sonner";
 import {
   Ban,
+  ChevronLeft,
   ChevronRight,
   CircleSlash,
   Clock,
@@ -403,9 +404,41 @@ function CardInner({
             KIT
           </span>
         )}
-        <span className="tnum ml-auto inline-flex items-center gap-1 text-[11px] text-ink-3">
-          <Clock className="size-3" />
-          {days === null ? "—" : days === 0 ? "today" : `${days}d`}
+        <span className="ml-auto flex items-center">
+          {/* §Phase-6 board arrows — keyboardable alternative to drag */}
+          {!dragging && onMove && BOARD_COLUMNS.indexOf(app.status as Status) > 0 && (
+            <button
+              type="button"
+              onPointerDown={stop}
+              onClick={() =>
+                onMove(app.id, BOARD_COLUMNS[BOARD_COLUMNS.indexOf(app.status as Status) - 1])
+              }
+              aria-label={`Move back to ${statusMeta(BOARD_COLUMNS[BOARD_COLUMNS.indexOf(app.status as Status) - 1]).label}`}
+              className="grid size-6 place-items-center rounded-md text-ink-3 opacity-0 transition-opacity hover:bg-white/[0.06] hover:text-foreground focus-visible:opacity-100 group-hover/card:opacity-100"
+            >
+              <ChevronLeft className="size-3.5" />
+            </button>
+          )}
+          {!dragging &&
+            onMove &&
+            BOARD_COLUMNS.includes(app.status as Status) &&
+            BOARD_COLUMNS.indexOf(app.status as Status) < BOARD_COLUMNS.length - 1 && (
+              <button
+                type="button"
+                onPointerDown={stop}
+                onClick={() =>
+                  onMove(app.id, BOARD_COLUMNS[BOARD_COLUMNS.indexOf(app.status as Status) + 1])
+                }
+                aria-label={`Advance to ${statusMeta(BOARD_COLUMNS[BOARD_COLUMNS.indexOf(app.status as Status) + 1]).label}`}
+                className="grid size-6 place-items-center rounded-md text-ink-3 opacity-0 transition-opacity hover:bg-white/[0.06] hover:text-foreground focus-visible:opacity-100 group-hover/card:opacity-100"
+              >
+                <ChevronRight className="size-3.5" />
+              </button>
+            )}
+          <span className="tnum ml-1 inline-flex items-center gap-1 text-[11px] text-ink-3">
+            <Clock className="size-3" />
+            {days === null ? "—" : days === 0 ? "today" : `${days}d`}
+          </span>
         </span>
       </div>
     </div>
