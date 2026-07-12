@@ -12,42 +12,40 @@ function scalar(row: { n: number } | undefined): number {
 }
 
 /** Counts for the sidebar badges. `actions` = live Action Queue length. */
-export function getNavCounts(): NavCounts {
-  const active = scalar(
+export async function getNavCounts(): Promise<NavCounts> {
+  const [activeRow, triageRow, apps, pendingRow] = await Promise.all([
     db
       .select({ n: count() })
       .from(applications)
       .where(inArray(applications.status, ACTIVE_STATUSES))
       .get(),
-  );
-
-  const triage = scalar(
     db
       .select({ n: count() })
       .from(scoutJobs)
       .where(eq(scoutJobs.status, "new"))
       .get(),
-  );
-
-  const actions = buildActionQueue(getAllApplications()).length;
-
-  const pendingProposals = scalar(
+    getAllApplications(),
     db
       .select({ n: count() })
       .from(proposals)
       .where(eq(proposals.status, "pending"))
       .get(),
-  );
+  ]);
 
-  return { active, triage, actions, proposals: pendingProposals };
+  return {
+    active: scalar(activeRow),
+    triage: scalar(triageRow),
+    actions: buildActionQueue(apps).length,
+    proposals: scalar(pendingRow),
+  };
 }
 
 /** All applications, most-recently-active first. */
-export function getAllApplications(): Application[] {
+export async function getAllApplications(): Promise<Application[]> {
   return db.select().from(applications).orderBy(desc(applications.lastActivityAt)).all();
 }
 
-export function getApplicationById(id: string): Application | undefined {
+export async function getApplicationById(id: string): Promise<Application | undefined> {
   return db.select().from(applications).where(eq(applications.id, id)).get();
 }
 
@@ -57,15 +55,15 @@ export interface BoardApplication extends Application {
 }
 
 /** Applications for the board (5 live columns + closed tray; excludes triage `sourced`). */
-export function getBoardApplications(): BoardApplication[] {
-  const apps = db
+export async function getBoardApplications(): Promise<BoardApplication[]> {
+  const apps = await db
     .select()
     .from(applications)
     .where(inArray(applications.status, [...BOARD_COLUMNS, ...CLOSED_STATUSES]))
     .orderBy(desc(applications.lastActivityAt))
     .all();
 
-  const stageRows = db
+  const stageRows = await db
     .select({
       appId: activities.applicationId,
       at: sql<number>`max(${activities.occurredAt})`,
@@ -85,7 +83,7 @@ export function getBoardApplications(): BoardApplication[] {
 }
 
 /** Timeline for one application, newest first. */
-export function getActivitiesForApplication(applicationId: string): Activity[] {
+export async function getActivitiesForApplication(applicationId: string): Promise<Activity[]> {
   return db
     .select()
     .from(activities)
@@ -100,7 +98,7 @@ export interface RecentActivity extends Activity {
 }
 
 /** Scout Inbox rows by triage status, best score first. */
-export function getScoutJobs(status: "new" | "dismissed" | "promoted") {
+export async function getScoutJobs(status: "new" | "dismissed" | "promoted") {
   return db
     .select()
     .from(scoutJobs)
@@ -110,7 +108,7 @@ export function getScoutJobs(status: "new" | "dismissed" | "promoted") {
 }
 
 /** Latest activity across the pipeline (for the Command strip). */
-export function getRecentActivities(limit = 8): RecentActivity[] {
+export async function getRecentActivities(limit = 8): Promise<RecentActivity[]> {
   return db
     .select({
       id: activities.id,
@@ -146,8 +144,8 @@ export interface PendingProposal {
 }
 
 /** Pending proposals with their source email, newest email first. */
-export function getPendingProposals(): PendingProposal[] {
-  const rows = db
+export async function getPendingProposals(): Promise<PendingProposal[]> {
+  const rows = await db
     .select({
       proposal: proposals,
       email: {
@@ -175,24 +173,24 @@ export interface SyncStatus {
 }
 
 /** Sync-state card data (Command Center + /inbox-sync header). */
-export function getSyncStatus(): SyncStatus {
-  const state = db.select().from(syncState).where(eq(syncState.id, "gmail")).get();
-  const pending = scalar(
-    db.select({ n: count() }).from(proposals).where(eq(proposals.status, "pending")).get(),
-  );
+export async function getSyncStatus(): Promise<SyncStatus> {
   const startOfDay = new Date();
   startOfDay.setHours(0, 0, 0, 0);
-  const resolvedToday = scalar(
+
+  const [state, pendingRow, resolvedRow] = await Promise.all([
+    db.select().from(syncState).where(eq(syncState.id, "gmail")).get(),
+    db.select({ n: count() }).from(proposals).where(eq(proposals.status, "pending")).get(),
     db
       .select({ n: count() })
       .from(proposals)
       .where(and(ne(proposals.status, "pending"), gte(proposals.resolvedAt, startOfDay)))
       .get(),
-  );
+  ]);
+
   return {
     lastRunAt: state?.lastRunAt ?? null,
     stats: (state?.stats as Record<string, number> | null) ?? null,
-    pending,
-    resolvedToday,
+    pending: scalar(pendingRow),
+    resolvedToday: scalar(resolvedRow),
   };
 }

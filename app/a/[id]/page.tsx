@@ -23,9 +23,9 @@ export default async function ApplicationDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const app = getApplicationById(id);
+  const app = await getApplicationById(id);
   if (!app) notFound();
-  const activities = getActivitiesForApplication(id);
+  const activities = await getActivitiesForApplication(id);
 
   return (
     <div className="mx-auto max-w-[1100px] px-4 py-6 md:px-6 md:py-8">

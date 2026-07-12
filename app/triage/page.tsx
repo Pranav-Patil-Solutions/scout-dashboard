@@ -16,12 +16,15 @@ export default async function TriagePage({
   const { tab: rawTab } = await searchParams;
   const tab: Tab = rawTab === "dismissed" || rawTab === "promoted" ? rawTab : "new";
 
-  const jobs = getScoutJobs(tab);
+  const jobs = await getScoutJobs(tab);
   const counts = Object.fromEntries(
-    (["new", "dismissed", "promoted"] as Tab[]).map((s) => [
-      s,
-      db.select({ n: count() }).from(scoutJobs).where(eq(scoutJobs.status, s)).get()?.n ?? 0,
-    ]),
+    await Promise.all(
+      (["new", "dismissed", "promoted"] as Tab[]).map(async (s): Promise<[Tab, number]> => [
+        s,
+        (await db.select({ n: count() }).from(scoutJobs).where(eq(scoutJobs.status, s)).get())
+          ?.n ?? 0,
+      ]),
+    ),
   ) as Record<Tab, number>;
 
   return (

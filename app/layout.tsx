@@ -25,12 +25,12 @@ export const metadata: Metadata = {
     "Control and analyse your job search: pipeline board, action queue, and conversion analytics.",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const counts = getNavCounts();
+  const counts = await getNavCounts();
 
   return (
     <html

@@ -24,8 +24,8 @@ const OUTCOME_LABEL: Record<string, string> = {
   interview: "Interview+",
 };
 
-export default function AnalyticsPage() {
-  const a = computeAnalytics();
+export default async function AnalyticsPage() {
+  const a = await computeAnalytics();
   const days = (v: number | null) => (v == null ? "—" : `${v}d`);
 
   return (

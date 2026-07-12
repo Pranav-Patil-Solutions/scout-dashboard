@@ -92,8 +92,8 @@ function outcomeOf(a: Application): Outcome {
   return "no_response";
 }
 
-export function computeAnalytics(now = new Date()): AnalyticsData {
-  const all = getAllApplications();
+export async function computeAnalytics(now = new Date()): Promise<AnalyticsData> {
+  const all = await getAllApplications();
   const applied = all.filter((a) => a.appliedAt);
 
   const respondedApps = applied.filter(responded);

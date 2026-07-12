@@ -13,8 +13,8 @@ import { CLOSED, STATUS_RANK, type ProposalPayload } from "./propose";
 
 export type ApplyResult = { ok: true } | { ok: false; error: string };
 
-export function acceptProposal(id: string): ApplyResult {
-  const p = db.select().from(proposals).where(eq(proposals.id, id)).get();
+export async function acceptProposal(id: string): Promise<ApplyResult> {
+  const p = await db.select().from(proposals).where(eq(proposals.id, id)).get();
   if (!p) return { ok: false, error: "proposal not found" };
   if (p.status !== "pending") return { ok: false, error: `proposal already ${p.status}` };
 
@@ -23,7 +23,7 @@ export function acceptProposal(id: string): ApplyResult {
   const now = new Date();
 
   try {
-    db.transaction((tx) => {
+    await db.transaction(async (tx) => {
       let applicationId = p.applicationId;
 
       switch (p.type) {
@@ -32,7 +32,7 @@ export function acceptProposal(id: string): ApplyResult {
           // the sibling add_application for the same company was accepted
           // first) — rematch before inserting, or accepting both Wolt cards
           // would create two Wolt rows
-          const apps = tx.select().from(applications).all();
+          const apps = await tx.select().from(applications).all();
           const knownRole =
             payload.roleTitle && payload.roleTitle !== "Unknown role"
               ? payload.roleTitle
@@ -52,12 +52,14 @@ export function acceptProposal(id: string): ApplyResult {
             const app = apps.find((a) => a.id === applicationId);
             if (!app) throw new Error("rematched application vanished");
             if (app.roleTitle === "Unknown role" && knownRole) {
-              tx.update(applications)
+              await tx
+                .update(applications)
                 .set({ roleTitle: knownRole, updatedAt: now })
                 .where(eq(applications.id, applicationId))
                 .run();
             }
-            tx.insert(activities)
+            await tx
+              .insert(activities)
               .values({
                 id: randomUUID(),
                 applicationId,
@@ -77,7 +79,8 @@ export function acceptProposal(id: string): ApplyResult {
                 !CLOSED.has(app.status) &&
                 (STATUS_RANK[target] ?? -1) > (STATUS_RANK[app.status] ?? 99);
               if (closing || forward) {
-                tx.update(applications)
+                await tx
+                  .update(applications)
                   .set({
                     status: target,
                     updatedAt: now,
@@ -90,7 +93,8 @@ export function acceptProposal(id: string): ApplyResult {
                   })
                   .where(eq(applications.id, applicationId))
                   .run();
-                tx.insert(activities)
+                await tx
+                  .insert(activities)
                   .values({
                     id: randomUUID(),
                     applicationId,
@@ -106,7 +110,8 @@ export function acceptProposal(id: string): ApplyResult {
           } else {
             applicationId = randomUUID();
             const initialStatus = payload.initialStatus ?? "applied";
-            tx.insert(applications)
+            await tx
+              .insert(applications)
               .values({
                 id: applicationId,
                 company: payload.company ?? "Unknown company",
@@ -120,7 +125,8 @@ export function acceptProposal(id: string): ApplyResult {
                   : {}),
               })
               .run();
-            tx.insert(activities)
+            await tx
+              .insert(activities)
               .values({
                 id: randomUUID(),
                 applicationId,
@@ -132,7 +138,8 @@ export function acceptProposal(id: string): ApplyResult {
               })
               .run();
           }
-          tx.update(emailEvents)
+          await tx
+            .update(emailEvents)
             .set({ matchedApplicationId: applicationId })
             .where(eq(emailEvents.id, p.sourceEmailEventId))
             .run();
@@ -141,7 +148,7 @@ export function acceptProposal(id: string): ApplyResult {
 
         case "set_status": {
           if (!applicationId) throw new Error("set_status proposal has no application");
-          const app = tx
+          const app = await tx
             .select()
             .from(applications)
             .where(eq(applications.id, applicationId))
@@ -150,7 +157,8 @@ export function acceptProposal(id: string): ApplyResult {
           const toStatus = payload.toStatus;
           if (!toStatus) throw new Error("set_status proposal has no toStatus");
           const closing = toStatus === "rejected";
-          tx.update(applications)
+          await tx
+            .update(applications)
             .set({
               status: toStatus,
               updatedAt: now,
@@ -163,7 +171,8 @@ export function acceptProposal(id: string): ApplyResult {
             })
             .where(eq(applications.id, applicationId))
             .run();
-          tx.insert(activities)
+          await tx
+            .insert(activities)
             .values({
               id: randomUUID(),
               applicationId,
@@ -179,7 +188,8 @@ export function acceptProposal(id: string): ApplyResult {
 
         case "log_activity": {
           if (!applicationId) throw new Error("log_activity proposal has no application");
-          tx.insert(activities)
+          await tx
+            .insert(activities)
             .values({
               id: randomUUID(),
               applicationId,
@@ -195,7 +205,7 @@ export function acceptProposal(id: string): ApplyResult {
 
         case "set_first_response": {
           if (!applicationId) throw new Error("set_first_response proposal has no application");
-          const app = tx
+          const app = await tx
             .select()
             .from(applications)
             .where(eq(applications.id, applicationId))
@@ -203,7 +213,8 @@ export function acceptProposal(id: string): ApplyResult {
           if (!app) throw new Error("application no longer exists");
           // only ever moves the timestamp EARLIER or fills a blank — never overwrites a real earlier response
           if (!app.firstResponseAt || app.firstResponseAt > occurredAt) {
-            tx.update(applications)
+            await tx
+              .update(applications)
               .set({ firstResponseAt: occurredAt, updatedAt: now })
               .where(eq(applications.id, applicationId))
               .run();
@@ -215,7 +226,8 @@ export function acceptProposal(id: string): ApplyResult {
           throw new Error(`unknown proposal type: ${p.type}`);
       }
 
-      tx.update(proposals)
+      await tx
+        .update(proposals)
         .set({ status: "accepted", resolvedAt: now, applicationId })
         .where(eq(proposals.id, id))
         .run();
@@ -226,11 +238,12 @@ export function acceptProposal(id: string): ApplyResult {
   }
 }
 
-export function dismissProposal(id: string): ApplyResult {
-  const p = db.select().from(proposals).where(eq(proposals.id, id)).get();
+export async function dismissProposal(id: string): Promise<ApplyResult> {
+  const p = await db.select().from(proposals).where(eq(proposals.id, id)).get();
   if (!p) return { ok: false, error: "proposal not found" };
   if (p.status !== "pending") return { ok: false, error: `proposal already ${p.status}` };
-  db.update(proposals)
+  await db
+    .update(proposals)
     .set({ status: "dismissed", resolvedAt: new Date() })
     .where(eq(proposals.id, id))
     .run();

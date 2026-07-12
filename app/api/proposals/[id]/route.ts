@@ -15,7 +15,7 @@ export async function PATCH(
       { status: 400 },
     );
   }
-  const result = action === "accept" ? acceptProposal(id) : dismissProposal(id);
+  const result = action === "accept" ? await acceptProposal(id) : await dismissProposal(id);
   if (!result.ok) {
     const status = result.error.includes("not found") ? 404 : 409;
     return NextResponse.json(result, { status });

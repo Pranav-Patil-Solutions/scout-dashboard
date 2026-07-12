@@ -42,14 +42,15 @@ function transitionPatch(
   return patch;
 }
 
-function logActivity(
+async function logActivity(
   appId: string,
   type: string,
   title: string,
   source = "manual",
   body?: string,
-) {
-  db.insert(activities)
+): Promise<void> {
+  await db
+    .insert(activities)
     .values({
       id: randomUUID(),
       applicationId: appId,
@@ -62,7 +63,7 @@ function logActivity(
     .run();
 }
 
-function getRow(id: string): Application | undefined {
+async function getRow(id: string): Promise<Application | undefined> {
   return db.select().from(applications).where(eq(applications.id, id)).get();
 }
 
@@ -76,7 +77,8 @@ export async function createApplication(input: ApplicationInput): Promise<{ id: 
   const status = input.status || "to_apply";
   const patch = transitionPatch(status, null);
 
-  db.insert(applications)
+  await db
+    .insert(applications)
     .values({
       id,
       company,
@@ -105,15 +107,16 @@ export async function createApplication(input: ApplicationInput): Promise<{ id: 
     })
     .run();
 
-  logActivity(id, "status_change", `Added to pipeline — ${statusMeta(status).label}`);
+  await logActivity(id, "status_change", `Added to pipeline — ${statusMeta(status).label}`);
 
   // §8 — promotion: link the scout job and take it out of triage.
   if (input.scoutJobId) {
-    db.update(scoutJobs)
+    await db
+      .update(scoutJobs)
       .set({ status: "promoted", promotedApplicationId: id })
       .where(eq(scoutJobs.id, input.scoutJobId))
       .run();
-    logActivity(id, "note", "Promoted from Scout Inbox", "scraper");
+    await logActivity(id, "note", "Promoted from Scout Inbox", "scraper");
   }
 
   revalidateAll();
@@ -124,7 +127,7 @@ export async function updateApplication(
   id: string,
   input: ApplicationInput,
 ): Promise<{ id: string }> {
-  const existing = getRow(id);
+  const existing = await getRow(id);
   if (!existing) throw new Error("Application not found.");
   const company = input.company?.trim();
   const roleTitle = input.roleTitle?.trim();
@@ -135,7 +138,8 @@ export async function updateApplication(
   const statusChanged = status !== existing.status;
   const patch = statusChanged ? transitionPatch(status, existing) : {};
 
-  db.update(applications)
+  await db
+    .update(applications)
     .set({
       company,
       roleTitle,
@@ -163,7 +167,7 @@ export async function updateApplication(
     .where(eq(applications.id, id))
     .run();
 
-  if (statusChanged) logActivity(id, "status_change", `Moved to ${statusMeta(status).label}`);
+  if (statusChanged) await logActivity(id, "status_change", `Moved to ${statusMeta(status).label}`);
   revalidateAll();
   return { id };
 }
@@ -173,24 +177,25 @@ export async function moveApplication(
   id: string,
   toStatus: string,
 ): Promise<{ ok: true }> {
-  const existing = getRow(id);
+  const existing = await getRow(id);
   if (!existing) throw new Error("Application not found.");
   if (existing.status === toStatus) return { ok: true };
 
   const now = new Date();
   const patch = transitionPatch(toStatus, existing);
-  db.update(applications)
+  await db
+    .update(applications)
     .set({ status: toStatus, lastActivityAt: now, updatedAt: now, snoozedUntil: null, ...patch })
     .where(eq(applications.id, id))
     .run();
 
-  logActivity(id, "status_change", `Moved to ${statusMeta(toStatus).label}`);
+  await logActivity(id, "status_change", `Moved to ${statusMeta(toStatus).label}`);
   revalidateAll();
   return { ok: true };
 }
 
 export async function deleteApplication(id: string): Promise<{ ok: true }> {
-  db.delete(applications).where(eq(applications.id, id)).run();
+  await db.delete(applications).where(eq(applications.id, id)).run();
   revalidateAll();
   return { ok: true };
 }
@@ -221,7 +226,7 @@ export async function patchApplication(
   id: string,
   patch: Partial<Record<PatchField, string | number | boolean | null>>,
 ): Promise<{ ok: true }> {
-  const existing = getRow(id);
+  const existing = await getRow(id);
   if (!existing) throw new Error("Application not found.");
 
   const set: Record<string, unknown> = { updatedAt: new Date() };
@@ -236,7 +241,7 @@ export async function patchApplication(
     if (key === "isKitReady") value = !!value;
     set[key] = value;
   }
-  db.update(applications).set(set).where(eq(applications.id, id)).run();
+  await db.update(applications).set(set).where(eq(applications.id, id)).run();
   revalidateAll();
   return { ok: true };
 }
@@ -245,12 +250,13 @@ export async function addActivity(
   applicationId: string,
   input: { type: string; title: string; body?: string },
 ): Promise<{ ok: true }> {
-  const existing = getRow(applicationId);
+  const existing = await getRow(applicationId);
   if (!existing) throw new Error("Application not found.");
   if (!input.title?.trim()) throw new Error("A title is required.");
 
-  logActivity(applicationId, input.type || "note", input.title.trim(), "manual", input.body?.trim() || undefined);
-  db.update(applications)
+  await logActivity(applicationId, input.type || "note", input.title.trim(), "manual", input.body?.trim() || undefined);
+  await db
+    .update(applications)
     .set({ lastActivityAt: new Date(), updatedAt: new Date() })
     .where(eq(applications.id, applicationId))
     .run();
@@ -260,25 +266,27 @@ export async function addActivity(
 
 /** Action Queue: hide this application's cards until `days` from now. */
 export async function snoozeApplication(id: string, days = 3): Promise<{ ok: true }> {
-  const existing = getRow(id);
+  const existing = await getRow(id);
   if (!existing) throw new Error("Application not found.");
   const until = new Date(Date.now() + days * 86_400_000);
-  db.update(applications)
+  await db
+    .update(applications)
     .set({ snoozedUntil: until, updatedAt: new Date() })
     .where(eq(applications.id, id))
     .run();
-  logActivity(id, "reminder", `Snoozed for ${days} days`, "system");
+  await logActivity(id, "reminder", `Snoozed for ${days} days`, "system");
   revalidateAll();
   return { ok: true };
 }
 
 /** Action Queue: record that a follow-up was sent (clears the overdue alert). */
 export async function logFollowUp(id: string): Promise<{ ok: true }> {
-  const existing = getRow(id);
+  const existing = await getRow(id);
   if (!existing) throw new Error("Application not found.");
   const now = new Date();
-  logActivity(id, "follow_up", "Follow-up sent", "manual");
-  db.update(applications)
+  await logActivity(id, "follow_up", "Follow-up sent", "manual");
+  await db
+    .update(applications)
     .set({
       lastActivityAt: now,
       updatedAt: now,
@@ -294,12 +302,13 @@ export async function logFollowUp(id: string): Promise<{ ok: true }> {
 
 /** Detail page: clear the next action once done. */
 export async function completeNextAction(id: string): Promise<{ ok: true }> {
-  const existing = getRow(id);
+  const existing = await getRow(id);
   if (!existing) throw new Error("Application not found.");
   const now = new Date();
   if (existing.nextAction)
-    logActivity(id, "note", `Done: ${existing.nextAction}`, "manual");
-  db.update(applications)
+    await logActivity(id, "note", `Done: ${existing.nextAction}`, "manual");
+  await db
+    .update(applications)
     .set({ nextAction: null, nextActionDue: null, lastActivityAt: now, updatedAt: now })
     .where(eq(applications.id, id))
     .run();
@@ -309,7 +318,7 @@ export async function completeNextAction(id: string): Promise<{ ok: true }> {
 
 /** Load a row for the edit sheet (returns serializable Dates). */
 export async function loadApplication(id: string): Promise<Application | null> {
-  return getRow(id) ?? null;
+  return (await getRow(id)) ?? null;
 }
 
 /* ==========================================================================
@@ -319,14 +328,14 @@ export async function loadApplication(id: string): Promise<Application | null> {
 
 export async function acceptProposalAction(id: string) {
   const { acceptProposal } = await import("./email/apply");
-  const result = acceptProposal(id);
+  const result = await acceptProposal(id);
   if (!result.ok) throw new Error(result.error);
   revalidateAll();
 }
 
 export async function dismissProposalAction(id: string) {
   const { dismissProposal } = await import("./email/apply");
-  const result = dismissProposal(id);
+  const result = await dismissProposal(id);
   if (!result.ok) throw new Error(result.error);
   revalidateAll();
 }

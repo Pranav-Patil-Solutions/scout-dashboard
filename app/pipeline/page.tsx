@@ -1,8 +1,8 @@
 import { getBoardApplications } from "@/lib/queries";
 import { Board } from "@/components/board";
 
-export default function PipelinePage() {
-  const apps = getBoardApplications();
+export default async function PipelinePage() {
+  const apps = await getBoardApplications();
 
   return (
     <div className="flex h-[calc(100dvh-3.5rem)] flex-col">

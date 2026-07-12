@@ -3,9 +3,9 @@
 import { randomUUID } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
-import Database from "better-sqlite3";
+import { createClient, type Client } from "@libsql/client";
 import { revalidatePath } from "next/cache";
-import { eq, sql } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { db } from "./db";
 import { scoutJobs } from "./db/schema";
 
@@ -38,11 +38,13 @@ function toDate(raw: unknown): Date | null {
 }
 
 /**
- * §8 — Import from the Python jobscraper's SQLite DB (read-only).
- * Resilient by design: missing file, unknown schema, or odd columns produce a
- * clear error, never a crash. Dedupe on url: new rows insert as status=new;
- * existing rows refresh score/reason/language but KEEP their triage status
- * (a dismissed job stays dismissed).
+ * §8 — Import from the Python jobscraper's SQLite DB (read-only usage: SELECTs
+ * only — the jobscraper repo must never be written to). Resilient by design:
+ * missing file, unknown schema, or odd columns produce a clear error, never a
+ * crash. Dedupe on url: new rows insert as status=new; existing rows refresh
+ * score/reason/language but KEEP their triage status (a dismissed job stays
+ * dismissed). Gracefully disabled when JOBSCRAPER_DB_PATH is unset (JOBDASH-003
+ * §5 — the scraper file only exists on the Mac).
  */
 export async function importScoutJobs(): Promise<ImportResult> {
   const raw = process.env.JOBSCRAPER_DB_PATH;
@@ -54,20 +56,23 @@ export async function importScoutJobs(): Promise<ImportResult> {
     return { ok: false, error: `Scraper DB not found at ${dbPath}. Check JOBSCRAPER_DB_PATH in .env.` };
   }
 
-  let scraper: InstanceType<typeof Database> | null = null;
+  let scraper: Client | null = null;
   try {
-    scraper = new Database(dbPath, { readonly: true, fileMustExist: true });
+    scraper = createClient({ url: `file:${dbPath}` });
 
     // Find a usable table: prefer "jobs", else the first table with url + title.
-    const tables = scraper
-      .prepare("SELECT name FROM sqlite_master WHERE type='table'")
-      .all() as { name: string }[];
+    const tableRes = await scraper.execute(
+      "SELECT name FROM sqlite_master WHERE type='table'",
+    );
+    const tables = tableRes.rows.map((r) => String(r[0]));
     let table: string | null = null;
-    const candidates = ["jobs", ...tables.map((t) => t.name)];
-    for (const name of candidates) {
-      if (!tables.some((t) => t.name === name)) continue;
-      const cols = (scraper.prepare(`PRAGMA table_info(${JSON.stringify(name).slice(1, -1)})`).all() as { name: string }[])
-        .map((c) => c.name.toLowerCase());
+    for (const name of ["jobs", ...tables]) {
+      if (!tables.includes(name)) continue;
+      const colRes = await scraper.execute({
+        sql: "SELECT name FROM pragma_table_info(?)",
+        args: [name],
+      });
+      const cols = colRes.rows.map((r) => String(r[0]).toLowerCase());
       if (cols.includes("url") && cols.includes("title")) {
         table = name;
         break;
@@ -77,17 +82,21 @@ export async function importScoutJobs(): Promise<ImportResult> {
       return { ok: false, error: "No table with url + title columns found in the scraper DB." };
     }
 
-    const rows = scraper.prepare(`SELECT * FROM "${table}"`).all() as Record<string, unknown>[];
+    const result = await scraper.execute(`SELECT * FROM "${table}"`);
+    // normalize each row to a lowercase-keyed record for flexible column names
+    const rows: Record<string, unknown>[] = result.rows.map((r) => {
+      const row: Record<string, unknown> = {};
+      result.columns.forEach((col, i) => {
+        row[col.toLowerCase()] = r[i];
+      });
+      return row;
+    });
 
     let imported = 0;
     let updated = 0;
 
-    db.transaction((tx) => {
-      for (const r of rows) {
-        // normalize keys to lowercase for flexible column names
-        const row: Record<string, unknown> = {};
-        for (const [k, v] of Object.entries(r)) row[k.toLowerCase()] = v;
-
+    await db.transaction(async (tx) => {
+      for (const row of rows) {
         const url = row.url ? String(row.url) : null;
         if (!url) continue;
 
@@ -106,14 +115,15 @@ export async function importScoutJobs(): Promise<ImportResult> {
           firstSeen: toDate(row.first_seen ?? row.created_at) ?? new Date(),
         };
 
-        const existing = tx
+        const existing = await tx
           .select({ id: scoutJobs.id })
           .from(scoutJobs)
           .where(eq(scoutJobs.url, url))
           .get();
 
         if (existing) {
-          tx.update(scoutJobs)
+          await tx
+            .update(scoutJobs)
             .set({
               score: values.score,
               reason: values.reason,
@@ -126,7 +136,8 @@ export async function importScoutJobs(): Promise<ImportResult> {
             .run();
           updated++;
         } else {
-          tx.insert(scoutJobs)
+          await tx
+            .insert(scoutJobs)
             .values({ id: randomUUID(), url, status: "new", ...values })
             .run();
           imported++;
@@ -147,13 +158,13 @@ export async function importScoutJobs(): Promise<ImportResult> {
 }
 
 export async function dismissScoutJob(id: string): Promise<{ ok: true }> {
-  db.update(scoutJobs).set({ status: "dismissed" }).where(eq(scoutJobs.id, id)).run();
+  await db.update(scoutJobs).set({ status: "dismissed" }).where(eq(scoutJobs.id, id)).run();
   revalidatePath("/", "layout");
   return { ok: true };
 }
 
 export async function restoreScoutJob(id: string): Promise<{ ok: true }> {
-  db.update(scoutJobs).set({ status: "new" }).where(eq(scoutJobs.id, id)).run();
+  await db.update(scoutJobs).set({ status: "new" }).where(eq(scoutJobs.id, id)).run();
   revalidatePath("/", "layout");
   return { ok: true };
 }

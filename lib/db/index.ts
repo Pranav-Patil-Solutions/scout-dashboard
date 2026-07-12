@@ -1,32 +1,26 @@
 import "server-only";
 import path from "node:path";
-import Database from "better-sqlite3";
-import { drizzle, type BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
-import { migrate } from "drizzle-orm/better-sqlite3/migrator";
+import { createClient } from "@libsql/client";
+import { drizzle, type LibSQLDatabase } from "drizzle-orm/libsql";
 import * as schema from "./schema";
-import { seedIfEmpty } from "./seed";
 
-const DB_PATH =
-  process.env.SCOUTDASH_DB_PATH || path.join(process.cwd(), "scoutdash.db");
+// Turso in the cloud (TURSO_* / DATABASE_* envs); the local SQLite file
+// otherwise. Migrations and seed are manual scripts now (npm run db:migrate /
+// db:seed) — nothing runs at boot (JOBDASH-003 §1).
+const url =
+  process.env.TURSO_DATABASE_URL ??
+  process.env.DATABASE_URL ??
+  `file:${path.join(process.cwd(), "scoutdash.db")}`;
+const authToken =
+  process.env.TURSO_AUTH_TOKEN ?? process.env.DATABASE_AUTH_TOKEN ?? undefined;
 
-export type ScoutDb = BetterSQLite3Database<typeof schema>;
+export type ScoutDb = LibSQLDatabase<typeof schema>;
 
 function createDb(): ScoutDb {
-  const sqlite = new Database(DB_PATH);
-  sqlite.pragma("journal_mode = WAL");
-  sqlite.pragma("foreign_keys = ON");
-  const db = drizzle(sqlite, { schema });
-
-  // Migrate on boot (§11 Phase 1). Idempotent — the migrator tracks applied files.
-  migrate(db, { migrationsFolder: path.join(process.cwd(), "drizzle") });
-
-  // Seed the real pipeline on first run only (§10).
-  seedIfEmpty(db);
-
-  return db;
+  return drizzle(createClient({ url, authToken }), { schema });
 }
 
-// Cache across HMR reloads in dev so we don't reopen / re-migrate every request.
+// Cache across HMR reloads in dev so we don't reopen a client every request.
 const globalForDb = globalThis as unknown as { __scoutDb?: ScoutDb };
 export const db: ScoutDb = globalForDb.__scoutDb ?? (globalForDb.__scoutDb = createDb());
 

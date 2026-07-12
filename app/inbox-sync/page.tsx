@@ -3,9 +3,8 @@ import { getPendingProposals, getSyncStatus } from "@/lib/queries";
 import { ProposalCard, SyncButton } from "@/components/proposal-review";
 import { fmtRelative } from "@/lib/format";
 
-export default function InboxSyncPage() {
-  const pending = getPendingProposals();
-  const status = getSyncStatus();
+export default async function InboxSyncPage() {
+  const [pending, status] = await Promise.all([getPendingProposals(), getSyncStatus()]);
 
   return (
     <div className="mx-auto max-w-[900px] px-4 py-6 md:px-6 md:py-8">

@@ -17,11 +17,13 @@ import { ActivityIcon } from "@/components/activity-icon";
 import { SyncButton } from "@/components/proposal-review";
 import { fmtRelative } from "@/lib/format";
 
-export default function CommandPage() {
-  const apps = getAllApplications();
+export default async function CommandPage() {
+  const [apps, recent, sync] = await Promise.all([
+    getAllApplications(),
+    getRecentActivities(8),
+    getSyncStatus(),
+  ]);
   const queue = buildActionQueue(apps);
-  const recent = getRecentActivities(8);
-  const sync = getSyncStatus();
   const now = new Date();
 
   const applied = apps.filter((a) => a.appliedAt);

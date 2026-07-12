@@ -27,10 +27,46 @@
 
 **P5 + Phase 6 FINAL GATE PASSED (2026-07-12).** Polish: G-chords (G C/P/A/I/E + nav kbd hints), board arrow moves (hover/focus, aria-labeled), mount motion w/ motion-reduce, mobile verified. Verification: `npm run build` ✓, Playwright smoke (5 pages × desktop+mobile, chord + arrow interaction tests, zero console/network errors) ✓, qa-runner 32/32 (vitest bootstrapped; real DB checksum-verified untouched) ✓, code-reviewer 2 blockers → fixed (`lib/email/privacy.ts` §8 scrub choke point + historical-rejection guard) → re-verified 0 BLOCKERS ✓. Repo is now git (repo-local identity, 3+ commits). Deltas 1–12 in EVOLUTION.md.
 
-## NEXT (open items, no phase pending)
+## NEXT — JOBDASH-003: Vercel migration (APPROVED by Pranav 2026-07-12, start here after /clear)
 
-- Ship-gate nits accepted as known: match.ts short-name containment (≥3 chars) can over-match; `claude -p` SIGKILL doesn't reap grandchildren; concurrent double-sync isn't locked (single-user local tool).
-- Future ticket candidates: JOBDASH-003 Gmail API source (replace .gmail-staging manual sweeps); Tailscale for phone access. Vercel deploy explicitly ruled out (local-first architecture).
+**Goal**: dashboard usable on Pranav's phone anywhere (Mac asleep OK) at a Vercel URL behind a password. Email sync STAYS on the Mac at $0 (claude-cli transport), writing to the cloud DB.
+
+```
+TICKET JOBDASH-003 — cloud DB + auth gate + Vercel deploy
+§1 DB driver swap: better-sqlite3 → @libsql/client via drizzle-orm/libsql (schema UNCHANGED —
+    Turso is SQLite). ALL call sites become async: lib/db/index.ts (drop boot-migrate+seed
+    singleton → plain client; migrations move to `npm run db:migrate` script), lib/queries.ts,
+    lib/actions.ts, lib/email/{apply,sync}.ts, lib/import.ts, lib/db/seed.ts (manual script,
+    NEVER auto-runs in cloud), every page component gains async/await. db.transaction(sync fn)
+    → libsql batch/transaction API. Local dev uses SAME driver with DATABASE_URL=file:scoutdash.db.
+§2 Provision: Turso via Vercel Marketplace (`vercel integration` flow; project not yet linked —
+    `vercel link` first). Fallback if marketplace flow needs interactive browser: have Pranav run
+    `! brew install tursodatabase/tap/turso && turso auth signup`. Env: TURSO_DATABASE_URL +
+    TURSO_AUTH_TOKEN (Vercel) / DATABASE_URL=file: (local default when unset).
+§3 Data migration: sqlite3 scoutdash.db .dump → replay to Turso (script, verify row counts match
+    per table). BACK UP scoutdash.db first. After migration, Mac local env points at Turso so
+    sync + phone see one DB; keep file: fallback documented.
+§4 Auth gate: middleware Basic-auth (BASIC_AUTH_USER/BASIC_AUTH_PASS envs). Active ONLY when
+    envs set → local stays open. Check Next 16 middleware vs proxy.ts naming in
+    node_modules/next/dist/docs FIRST (AGENTS.md rule).
+§5 Serverless guards: /api/sync returns 501 + friendly message when SYNC_DISABLED=1 (set on
+    Vercel — claude CLI doesn't exist there; SyncButton shows "run sync from the Mac" hint).
+    Scout import (lib/import.ts, jobscraper local file) gracefully disabled when
+    JOBSCRAPER_DB_PATH unset. better-sqlite3 dependency REMOVED (breaks Vercel native build).
+§6 Verify gate (same bar as P5): npx tsc 0 · npm test 32/32 (fixtures don't touch DB — should
+    survive) · npm run build · local Playwright smoke vs file: DB · deploy PREVIEW via `vercel`
+    (guard.sh allows preview; prod needs Pranav's explicit OK + ALLOW_PROD=1) · smoke the preview
+    URL incl. Basic-auth challenge + a real accept/dismiss round-trip against Turso.
+§7 Ship: give Pranav the preview URL + credentials; prod promote only on his OK. Update
+    HANDOFF/EVOLUTION, commit, push to GitHub (origin exists).
+GUARDS: never run destructive SQL against Turso without a fresh scoutdash.db backup; sync
+    remains Mac-only; §8 privacy scrub unchanged (bodies never reach ANY database, cloud included).
+```
+
+## Open items (non-blocking)
+
+- Ship-gate nits accepted as known: match.ts short-name containment (≥3 chars) can over-match; `claude -p` SIGKILL doesn't reap grandchildren; concurrent double-sync isn't locked.
+- Future: Gmail API source (replace .gmail-staging manual sweeps).
 
 ## GOTCHAS
 

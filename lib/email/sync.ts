@@ -30,7 +30,7 @@ export interface SyncStats {
  * re-syncing never double-processes or double-proposes.
  */
 export async function runSync(): Promise<SyncStats> {
-  const state = db.select().from(syncState).where(eq(syncState.id, "gmail")).get();
+  const state = await db.select().from(syncState).where(eq(syncState.id, "gmail")).get();
   const { emails, nextCursor } = await stagingSource.fetchSince(
     state?.lastCursor ?? null,
   );
@@ -38,9 +38,9 @@ export async function runSync(): Promise<SyncStats> {
   let ingested = 0;
   let duplicates = 0;
 
-  db.transaction((tx) => {
+  await db.transaction(async (tx) => {
     for (const email of emails) {
-      const inserted = tx
+      const inserted = await tx
         .insert(emailEvents)
         .values({
           id: randomUUID(),
@@ -54,7 +54,7 @@ export async function runSync(): Promise<SyncStats> {
         })
         .onConflictDoNothing({ target: emailEvents.gmailMessageId })
         .run();
-      if (inserted.changes > 0) ingested++;
+      if (inserted.rowsAffected > 0) ingested++;
       else duplicates++;
     }
   });
@@ -67,7 +67,8 @@ export async function runSync(): Promise<SyncStats> {
     duplicates,
     ...processed,
   };
-  db.insert(syncState)
+  await db
+    .insert(syncState)
     .values({ id: "gmail", lastCursor: nextCursor, lastRunAt: new Date(), stats })
     .onConflictDoUpdate({
       target: syncState.id,
@@ -87,7 +88,7 @@ async function processNewEvents(): Promise<{
 }> {
   // chronological order — the temporal downgrade guard in propose.ts assumes
   // older emails are processed before newer ones
-  const pending = db
+  const pending = await db
     .select()
     .from(emailEvents)
     .where(isNull(emailEvents.processedAt))
@@ -113,11 +114,11 @@ async function processNewEvents(): Promise<{
 
   const { classifications, llmCalls } = await classifyEmails(rawList);
 
-  const apps = db.select().from(applications).all();
+  const apps = await db.select().from(applications).all();
   const appById = new Map(apps.map((a) => [a.id, a]));
   // thread continuity: an already-matched event pins its whole thread
   const threadMatches = new Map<string, string>();
-  for (const ev of db.select().from(emailEvents).all()) {
+  for (const ev of await db.select().from(emailEvents).all()) {
     if (ev.threadId && ev.matchedApplicationId)
       threadMatches.set(ev.threadId, ev.matchedApplicationId);
   }
@@ -126,7 +127,7 @@ async function processNewEvents(): Promise<{
   let proposalCount = 0;
   let autoApplied = 0;
 
-  db.transaction((tx) => {
+  await db.transaction(async (tx) => {
     for (const ev of pending) {
       const raw = classifications.get(ev.gmailMessageId);
       if (!raw) continue; // stays unprocessed — retried on the next sync
@@ -149,7 +150,8 @@ async function processNewEvents(): Promise<{
 
       const drafts = buildProposals(ev, c, app && match ? { app, match } : null);
       for (const d of drafts) {
-        tx.insert(proposals)
+        await tx
+          .insert(proposals)
           .values({
             id: randomUUID(),
             type: d.type,
@@ -164,7 +166,8 @@ async function processNewEvents(): Promise<{
         proposalCount++;
 
         if (d.autoApply && d.applicationId) {
-          tx.insert(activities)
+          await tx
+            .insert(activities)
             .values({
               id: randomUUID(),
               applicationId: d.applicationId,
@@ -178,7 +181,8 @@ async function processNewEvents(): Promise<{
           const current = appById.get(d.applicationId);
           const occurred = new Date(d.payload.occurredAt);
           if (current && (!current.lastActivityAt || current.lastActivityAt < occurred)) {
-            tx.update(applications)
+            await tx
+              .update(applications)
               .set({ lastActivityAt: occurred })
               .where(eq(applications.id, d.applicationId))
               .run();
@@ -189,7 +193,8 @@ async function processNewEvents(): Promise<{
       }
 
       if (ev.threadId && match) threadMatches.set(ev.threadId, match.applicationId);
-      tx.update(emailEvents)
+      await tx
+        .update(emailEvents)
         .set({
           classification: c,
           matchedApplicationId: match?.applicationId ?? null,

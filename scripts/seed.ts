@@ -1,11 +1,30 @@
+/**
+ * JOBDASH-003 §1 — manual seed (moved out of the boot path in lib/db/index.ts;
+ * it must NEVER auto-run in the cloud).
+ * Run: npm run db:seed   (or: npx tsx scripts/seed.ts)
+ *
+ * Seeds Pranav's real pipeline as of 2026-07-11 (JOBDASH-001 §10) ONLY when
+ * the applications table is empty — a populated database is never touched.
+ * Same env resolution as lib/db/index.ts: Turso when TURSO_DATABASE_URL is
+ * set, else DATABASE_URL, else the local file:scoutdash.db.
+ */
 import { randomUUID } from "node:crypto";
-import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
+import path from "node:path";
+import { createClient } from "@libsql/client";
+import { drizzle, type LibSQLDatabase } from "drizzle-orm/libsql";
 import { sql } from "drizzle-orm";
-import * as schema from "./schema";
-import { activities, applications, scoutJobs } from "./schema";
-import { deriveFitBand } from "../constants";
+import * as schema from "../lib/db/schema";
+import { activities, applications, scoutJobs } from "../lib/db/schema";
+import { deriveFitBand } from "../lib/constants";
 
-type Db = BetterSQLite3Database<typeof schema>;
+const url =
+  process.env.TURSO_DATABASE_URL ??
+  process.env.DATABASE_URL ??
+  `file:${path.join(process.cwd(), "scoutdash.db")}`;
+const authToken =
+  process.env.TURSO_AUTH_TOKEN ?? process.env.DATABASE_AUTH_TOKEN ?? undefined;
+
+type Db = LibSQLDatabase<typeof schema>;
 
 const d = (iso: string) => new Date(iso);
 
@@ -263,17 +282,18 @@ const SEED_SCOUT_JOBS = [
   },
 ];
 
-export function seedIfEmpty(db: Db): void {
-  const existing = db
+async function seedIfEmpty(db: Db): Promise<boolean> {
+  const existing = await db
     .select({ n: sql<number>`count(*)` })
     .from(applications)
     .get();
-  if (existing && existing.n > 0) return;
+  if (existing && existing.n > 0) return false;
 
-  db.transaction((tx) => {
+  await db.transaction(async (tx) => {
     for (const a of SEED_APPS) {
       const id = randomUUID();
-      tx.insert(applications)
+      await tx
+        .insert(applications)
         .values({
           id,
           company: a.company,
@@ -304,7 +324,8 @@ export function seedIfEmpty(db: Db): void {
         .run();
 
       for (const ev of a.timeline) {
-        tx.insert(activities)
+        await tx
+          .insert(activities)
           .values({
             id: randomUUID(),
             applicationId: id,
@@ -319,9 +340,31 @@ export function seedIfEmpty(db: Db): void {
     }
 
     for (const j of SEED_SCOUT_JOBS) {
-      tx.insert(scoutJobs)
+      await tx
+        .insert(scoutJobs)
         .values({ id: randomUUID(), status: "new", ...j })
         .run();
     }
   });
+  return true;
 }
+
+async function main(): Promise<void> {
+  const client = createClient({ url, authToken });
+  try {
+    const db = drizzle(client, { schema });
+    const seeded = await seedIfEmpty(db);
+    console.log(
+      seeded
+        ? `Seeded ${SEED_APPS.length} applications + ${SEED_SCOUT_JOBS.length} scout jobs into ${url}`
+        : "applications table is not empty — nothing seeded.",
+    );
+  } finally {
+    client.close();
+  }
+}
+
+main().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});

@@ -5,7 +5,7 @@ import { emailEvents, proposals } from "@/lib/db/schema";
 
 /** GET /api/proposals — pending proposals with their source email, newest first (P4 review UI). */
 export async function GET() {
-  const rows = db
+  const rows = await db
     .select({
       proposal: proposals,
       email: {
