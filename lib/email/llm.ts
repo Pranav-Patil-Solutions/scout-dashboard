@@ -179,18 +179,30 @@ async function classifyViaApi(
   userPrompt: string,
   expectedIds: string[],
 ): Promise<LlmResult[]> {
-  const response = await client().messages.create({
-    model,
-    max_tokens: 8000,
-    system: SYSTEM_PROMPT,
-    output_config: {
-      format: { type: "json_schema", schema: RESULT_SCHEMA },
-    },
-    messages: [{ role: "user", content: userPrompt }],
-  });
-  const text = response.content.find((b) => b.type === "text");
-  if (!text || text.type !== "text") throw new Error("No structured output returned");
-  return validateResults(JSON.parse(text.text), expectedIds);
+  let lastError = "";
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const nudge =
+      attempt === 0
+        ? ""
+        : `\n\nYour previous output was invalid (${lastError}). Return one result for EVERY email id.`;
+    const response = await client().messages.create({
+      model,
+      max_tokens: 8000,
+      system: SYSTEM_PROMPT,
+      output_config: {
+        format: { type: "json_schema", schema: RESULT_SCHEMA },
+      },
+      messages: [{ role: "user", content: userPrompt + nudge }],
+    });
+    const text = response.content.find((b) => b.type === "text");
+    try {
+      if (!text || text.type !== "text") throw new Error("No structured output returned");
+      return validateResults(JSON.parse(text.text), expectedIds);
+    } catch (e) {
+      lastError = e instanceof Error ? e.message : String(e);
+    }
+  }
+  throw new Error(`api transport failed: ${lastError}`);
 }
 
 async function classifyViaCli(

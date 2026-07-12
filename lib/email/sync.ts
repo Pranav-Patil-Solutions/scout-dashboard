@@ -5,6 +5,7 @@ import { db } from "../db";
 import { activities, applications, emailEvents, proposals, syncState } from "../db/schema";
 import { classifyEmails } from "./classify";
 import { matchApplication, type MatchResult } from "./match";
+import { scrubClassification } from "./privacy";
 import { buildProposals } from "./propose";
 import { stagingSource } from "./staging-source";
 import type { RawEmail } from "./types";
@@ -84,10 +85,13 @@ async function processNewEvents(): Promise<{
   proposals: number;
   autoApplied: number;
 }> {
+  // chronological order — the temporal downgrade guard in propose.ts assumes
+  // older emails are processed before newer ones
   const pending = db
     .select()
     .from(emailEvents)
     .where(isNull(emailEvents.processedAt))
+    .orderBy(emailEvents.receivedAt)
     .all();
   if (pending.length === 0)
     return { classified: 0, llmCalls: 0, proposals: 0, autoApplied: 0 };
@@ -124,8 +128,15 @@ async function processNewEvents(): Promise<{
 
   db.transaction((tx) => {
     for (const ev of pending) {
-      const c = classifications.get(ev.gmailMessageId);
-      if (!c) continue; // stays unprocessed — retried on the next sync
+      const raw = classifications.get(ev.gmailMessageId);
+      if (!raw) continue; // stays unprocessed — retried on the next sync
+      // §8 choke point: nothing body-derived may be persisted from here on
+      const c = scrubClassification(
+        raw,
+        ev.subject,
+        ev.snippet,
+        raws.get(ev.gmailMessageId)?.body,
+      );
 
       let match: MatchResult | null = null;
       const threadAppId = ev.threadId ? threadMatches.get(ev.threadId) : undefined;

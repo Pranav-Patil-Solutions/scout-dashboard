@@ -168,6 +168,7 @@ export function buildProposals(
       let skip = false;
       if (target === "rejected") {
         if (CLOSED.has(app.status)) skip = true; // already closed — nothing to change
+        else if (historical) skip = true; // stale rejection — the app has since moved on
       } else if (CLOSED.has(app.status)) {
         if (historical) skip = true;
         else statusFlags.reopens = true;
