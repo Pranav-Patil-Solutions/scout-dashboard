@@ -1,0 +1,27 @@
+{
+  "version": "7",
+  "dialect": "sqlite",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "6",
+      "when": 1783767168379,
+      "tag": "0000_fuzzy_miracleman",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1783770810185,
+      "tag": "0001_easy_major_mapleleaf",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1783773291219,
+      "tag": "0002_first_demogoblin",
+      "breakpoints": true
+    }
+  ]
+}

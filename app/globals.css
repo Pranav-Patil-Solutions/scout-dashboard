@@ -1,0 +1,177 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-geist-mono);
+  --font-heading: var(--font-sans);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  /* Aurora Signal — custom surface + ink tokens */
+  --color-elevated: var(--elevated);
+  --color-hairline: var(--hairline);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-accent-hi: var(--accent-hi);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+/* ===========================================================================
+   Aurora Signal — dark-committed operator palette (JOBDASH-001 §9, Direction B)
+   The product is deliberately single-theme (a dark operator tool); tokens are
+   identical under :root and .dark so every base-ui `dark:` variant resolves
+   correctly while the app is unconditionally dark.
+   =========================================================================== */
+:root,
+.dark {
+  --background: #0a0a0f;
+  --foreground: #edeef2;
+  --card: #14151c;
+  --card-foreground: #edeef2;
+  --popover: #16181f;
+  --popover-foreground: #edeef2;
+  --primary: #7c6bf5;
+  --primary-foreground: #ffffff;
+  --secondary: #1e2029;
+  --secondary-foreground: #edeef2;
+  --muted: #191b22;
+  --muted-foreground: #a2a6b4;
+  --accent: #22242e;
+  --accent-foreground: #ffffff;
+  --destructive: #fb5473;
+  --border: rgba(255, 255, 255, 0.08);
+  --input: rgba(255, 255, 255, 0.12);
+  --ring: #7c6bf5;
+  --radius: 0.875rem;
+
+  /* custom surfaces + ink scale */
+  --elevated: #1b1d26;
+  --hairline: rgba(255, 255, 255, 0.08);
+  --ink-2: #a2a6b4;
+  --ink-3: #666b7d;
+  --accent-hi: #9b8cff;
+  --accent-grad: linear-gradient(135deg, #7c6bf5, #4e7df0);
+  --glow: rgba(124, 107, 245, 0.2);
+
+  /* status palette — reserved (state, never a series color) */
+  --status-sourced: #8a8fa3;
+  --status-to_apply: #9b8cff;
+  --status-applied: #6b7a99;
+  --status-screening: #fbb03b;
+  --status-interview: #17c08a;
+  --status-offer: #f4c430;
+  --status-rejected: #fb5473;
+  --status-withdrawn: #5b616b;
+  --status-missed: #ff5a52;
+
+  /* fit bands */
+  --fit-strong: #17c08a;
+  --fit-stretch: #fbb03b;
+  --fit-skip: #6b7a99;
+
+  /* categorical chart ramp — VALIDATED (dataviz validator, dark, vs #14151c and #0a0a0f):
+     lightness band ✓ chroma ✓ CVD ΔE≥22 ✓ contrast ≥3:1 ✓ */
+  --chart-1: #7c6bf5;
+  --chart-2: #0fa39a;
+  --chart-3: #c98317;
+  --chart-4: #d4557c;
+  --chart-5: #5b8def;
+
+  /* sidebar */
+  --sidebar: #0c0d13;
+  --sidebar-foreground: #edeef2;
+  --sidebar-primary: #7c6bf5;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #1b1d26;
+  --sidebar-accent-foreground: #edeef2;
+  --sidebar-border: rgba(255, 255, 255, 0.07);
+  --sidebar-ring: #7c6bf5;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html {
+    @apply font-sans;
+    color-scheme: dark;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "cv11", "ss01";
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  ::selection {
+    background: color-mix(in oklab, var(--primary) 32%, transparent);
+    color: #fff;
+  }
+  /* tabular numerals wherever digits align (tiles, tables, chips) */
+  .tnum {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
+  }
+  /* recessive custom scrollbars for the operator feel */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.12) transparent;
+  }
+  *::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  *::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 999px;
+    border: 3px solid transparent;
+    background-clip: content-box;
+  }
+  *::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.18);
+    background-clip: content-box;
+  }
+  .no-scrollbar {
+    scrollbar-width: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+}

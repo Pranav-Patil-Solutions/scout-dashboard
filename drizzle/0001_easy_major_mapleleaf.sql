@@ -1,0 +1,1 @@
+ALTER TABLE `applications` ADD `snoozed_until` integer;
