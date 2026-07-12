@@ -1,6 +1,6 @@
 # HANDOFF — Scout Control (JOBDASH-001 + JOBDASH-002)
 
-> Resume file for a fresh Claude Code session. Repo: `~/scout-dashboard`. Dev: `npm run dev` → http://localhost:3312 (port 3312 fixed; 3000 is taken). DB: `scoutdash.db` (SQLite via Drizzle/better-sqlite3, boot-migrate + seed singleton in `lib/db/index.ts`).
+> Resume file for a fresh Claude Code session. Repo: `~/scout-dashboard`. Serving (since 2026-07-12, Pranav-approved LAN access): production mode via `npx next start -H 0.0.0.0 -p 3312` → http://localhost:3312 + http://<mac-ip>:3312 on home Wi-Fi (no auth — LAN exposure was an explicit user choice). For code changes use `npm run dev` (localhost) then rebuild + restart prod. Port 3312 fixed; 3000 is taken. DB: `scoutdash.db` (SQLite via Drizzle/better-sqlite3, boot-migrate + seed singleton in `lib/db/index.ts`).
 
 ## DONE
 
