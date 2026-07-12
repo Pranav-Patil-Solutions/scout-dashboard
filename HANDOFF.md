@@ -25,9 +25,12 @@
 
 **P4 BUILT + verified (2026-07-12)**: `/inbox-sync` page (header w/ last-sync stats, §7 trust strip, proposal cards: type chip + confidence + flag badges + evidence blockquote + source email + Accept/Dismiss via server actions `acceptProposalAction`/`dismissProposalAction` in lib/actions.ts), `components/proposal-review.tsx` (ProposalCard + SyncButton), sync-status strip under Command Center Action Queue, nav "Email Sync" entry with pending-proposals badge (NavCounts.proposals). Verified: Playwright screenshots on-system, real browser click of Sync now → toast, GET /api/proposals 200. 4 real pending cards await Pranav's decision (Hays/XING, Munchies outbound, Mmaah, Reonic low-conf).
 
-## NEXT (in order)
-1. **002-P5 + 001-Phase 6 COMBINED FINAL GATE** (user chose one final gate): polish (empty states w/ imagery, motion, keyboard G+P/G+A chords — G E for Email Sync already reserved in nav, board arrows, responsive, a11y) + verification: `npm run build` pass, Playwright smoke screenshots, code-reviewer agent zero blockers, qa-runner zero blockers. Playwright lives in scratchpad, use playwright@1.61.1 (matches cached chromium-1228 — do NOT install 1.50.x).
-2. Log deltas in `EVOLUTION.md` per global Evolve rule.
+**P5 + Phase 6 FINAL GATE PASSED (2026-07-12).** Polish: G-chords (G C/P/A/I/E + nav kbd hints), board arrow moves (hover/focus, aria-labeled), mount motion w/ motion-reduce, mobile verified. Verification: `npm run build` ✓, Playwright smoke (5 pages × desktop+mobile, chord + arrow interaction tests, zero console/network errors) ✓, qa-runner 32/32 (vitest bootstrapped; real DB checksum-verified untouched) ✓, code-reviewer 2 blockers → fixed (`lib/email/privacy.ts` §8 scrub choke point + historical-rejection guard) → re-verified 0 BLOCKERS ✓. Repo is now git (repo-local identity, 3+ commits). Deltas 1–12 in EVOLUTION.md.
+
+## NEXT (open items, no phase pending)
+
+- Ship-gate nits accepted as known: match.ts short-name containment (≥3 chars) can over-match; `claude -p` SIGKILL doesn't reap grandchildren; concurrent double-sync isn't locked (single-user local tool).
+- Future ticket candidates: JOBDASH-003 Gmail API source (replace .gmail-staging manual sweeps); Tailscale for phone access. Vercel deploy explicitly ruled out (local-first architecture).
 
 ## GOTCHAS
 
