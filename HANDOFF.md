@@ -29,7 +29,40 @@
 
 **Posting-expiry watchdog SHIPPED (2026-07-13)**: `lib/posting-verdict.ts` (pure per-ATS rules: Ashby og:title, join.com `__NEXT_DATA__` status — its i18n bundle contains tombstone text on EVERY page, never text-match; SmartRecruiters public API 200/404; ambiguous = unknown = no-op) + `lib/posting-check.ts` (auto-move dead postings → expired_missed w/ evidence activity) + `POST /api/check-postings` (works on Vercel too) + piggyback in `/api/sync` + Command Center "Check postings" button. 40/40 tests. Live-verified: dead Tacto Ashby posting (HTTP 200!) auto-moved to Missed; WeFlow/Kadmos live; idempotent. Delta 16.
 
-## NEXT — JOBDASH-003: Vercel migration — COMPLETED 2026-07-12 (see deltas 13–15; live at scout-dashboard-nine-ruby.vercel.app). Original ticket kept below for reference.
+## NEXT — JOBDASH-004: Apply-Click Lifecycle & Auto-Reconcile (P0 CONFIRMED 2026-07-13, start here after /clear)
+
+**Spec = source of truth: `docs/JOBDASH-004-apply-lifecycle.md`** — full config, 10-transition
+table, integration seams, gated P1–P5 plan. Renumbered from the ticket's "003" (taken by the
+shipped migration below; revert if Pranav prefers).
+
+**Goal**: see jobs → click APPLY (tracked) → Gmail confirms whether it actually applied → if not,
+escalating reminders push it forward → if the posting expires/goes stale unapplied, archive then
+(after 30d grace) delete. One idempotent **Mac-only** `reconcile()` is the heartbeat.
+
+**P0 decisions locked (in the spec):**
+1. **UNIFY status model** — retire `expired_missed`; closed-unapplied path = `expired → archived`;
+   `expiry_reason` (`missed_kit`) drives the analytics "missed" count. Migrate consumers:
+   `posting-check.ts`, `constants.ts`, `analytics.ts`, Moss seed row.
+2. **apply_clicked = pulsing badge** in the To-apply column, NOT a 6th board column.
+3. **reconcile Mac-only** — `POST /api/reconcile` + "Reconcile now" button + optional local `/loop`; no cron v1.
+4. Build in a fresh session from this HANDOFF + the spec doc.
+
+**Big reuse note (HANDOFF delta 16):** §5 liveness/expiry is ALREADY BUILT and smarter than the
+ticket's naive scan — `lib/posting-verdict.ts` (per-ATS: Ashby dead-at-HTTP-200, join `__NEXT_DATA__`,
+SmartRecruiters API) + `lib/posting-check.ts` + `/api/check-postings`. JOBDASH-004 §5 = retarget its
+verdict to `expired→archived`+`expiry_reason` and call it from reconcile; do NOT reinvent.
+
+**Refinements folded in (ticket-vs-code diff):** A patch `propose.ts` STATUS_RANK(apply_clicked=1.5)+CLOSED ·
+B confirmation auto-apply (T2) only for `apply_clicked` apps, else keep the proposal queue ·
+C add nullable `close_date` col · D `REMINDER_STEPS_H=[24,72,144]` + T3 guard `count<len` ·
+E expiry prefers `close_date`/`next_action_due` over pure age · F moot (see reuse note).
+
+New `applications` columns for P1: clicked_at, confirm_deadline_at, lapsed_at, expired_at,
+archived_at, reminder_count, reminder_last_at, expiry_reason, close_date.
+
+---
+
+### JOBDASH-003 — Vercel/Turso migration: COMPLETED 2026-07-12 (deltas 13–15; live at scout-dashboard-nine-ruby.vercel.app). Original ticket kept below for reference.
 
 **Goal**: dashboard usable on Pranav's phone anywhere (Mac asleep OK) at a Vercel URL behind a password. Email sync STAYS on the Mac at $0 (claude-cli transport), writing to the cloud DB.
 

@@ -4,3 +4,6 @@ scoutdash.db*
 .env*
 .gmail-staging/
 .vercel
+
+# generated application kits (local documents)
+kits/

@@ -1,5 +1,5 @@
-import { spawn } from "node:child_process";
 import Anthropic from "@anthropic-ai/sdk";
+import { claudePrompt } from "../llm-cli";
 import type { Classification, EmailCategory, RawEmail } from "./types";
 
 /**
@@ -147,33 +147,6 @@ function extractJson(text: string): string {
   return candidate.slice(start, end + 1);
 }
 
-const CLI_TIMEOUT_MS = 300_000;
-
-function runClaudeCli(args: string[], stdinInput: string): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const child = spawn("claude", args, { stdio: ["pipe", "pipe", "pipe"] });
-    let out = "";
-    let err = "";
-    const timer = setTimeout(() => {
-      child.kill("SIGKILL");
-      reject(new Error(`claude -p timed out after ${CLI_TIMEOUT_MS / 1000}s`));
-    }, CLI_TIMEOUT_MS);
-    child.stdout.on("data", (d) => (out += d));
-    child.stderr.on("data", (d) => (err += d));
-    child.on("error", (e) => {
-      clearTimeout(timer);
-      reject(e);
-    });
-    child.on("close", (code) => {
-      clearTimeout(timer);
-      if (code !== 0) reject(new Error(`claude -p exited ${code}: ${err || out}`));
-      else resolve(out);
-    });
-    child.stdin.write(stdinInput);
-    child.stdin.end();
-  });
-}
-
 async function classifyViaApi(
   model: string,
   userPrompt: string,
@@ -217,30 +190,20 @@ async function classifyViaCli(
       attempt === 0
         ? ""
         : `\n\nYour previous output was invalid (${lastError}). Output ONLY the raw JSON object this time.`;
-    let stdout: string;
+    let resultText: string;
     try {
-      stdout = await runClaudeCli(
-        ["-p", "--model", model, "--output-format", "json", "--system-prompt", SYSTEM_PROMPT],
-        userPrompt + schemaNote + nudge,
-      );
+      resultText = await claudePrompt({
+        model,
+        system: SYSTEM_PROMPT,
+        prompt: userPrompt + schemaNote + nudge,
+      });
     } catch (e) {
-      // timeouts / spawn failures are as retryable as bad JSON
+      // timeouts / spawn failures / envelope errors are as retryable as bad JSON
       lastError = e instanceof Error ? e.message : String(e);
       continue;
     }
-    let envelope: { is_error?: boolean; subtype?: string; result?: string };
     try {
-      envelope = JSON.parse(stdout);
-    } catch {
-      lastError = "CLI stdout was not JSON";
-      continue;
-    }
-    if (envelope.is_error || typeof envelope.result !== "string") {
-      lastError = `CLI error: ${envelope.subtype ?? "no result"}`;
-      continue;
-    }
-    try {
-      return validateResults(JSON.parse(extractJson(envelope.result)), expectedIds);
+      return validateResults(JSON.parse(extractJson(resultText)), expectedIds);
     } catch (e) {
       lastError = e instanceof Error ? e.message : String(e);
     }

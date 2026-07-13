@@ -1,3 +1,5 @@
+import { existsSync } from "node:fs";
+import path from "node:path";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, ExternalLink, FileBadge, FileText } from "lucide-react";
@@ -8,6 +10,7 @@ import { InlineField } from "@/components/detail/inline-field";
 import { Timeline } from "@/components/detail/timeline";
 import { NextActionCard } from "@/components/detail/next-action-card";
 import { EditButton } from "@/components/detail/edit-button";
+import { KitGenerator } from "@/components/detail/kit-card";
 import {
   GERMAN_REQ_META,
   SENIORITY,
@@ -26,6 +29,14 @@ export default async function ApplicationDetailPage({
   const app = await getApplicationById(id);
   if (!app) notFound();
   const activities = await getActivitiesForApplication(id);
+
+  // Generated-kit presence (Mac-local files; false on serverless, try-wrapped)
+  let hasKit = false;
+  try {
+    hasKit = existsSync(path.join(process.cwd(), "kits", id, "resume.pdf"));
+  } catch {
+    hasKit = false;
+  }
 
   return (
     <div className="mx-auto max-w-[1100px] px-4 py-6 md:px-6 md:py-8">
@@ -220,6 +231,7 @@ export default async function ApplicationDetailPage({
                 placeholder="covers/…"
               />
             </div>
+            <KitGenerator appId={app.id} hasKit={hasKit} />
           </section>
 
           {/* Next action */}
