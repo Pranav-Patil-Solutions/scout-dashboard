@@ -31,6 +31,8 @@
 
 **JOBDASH-005 kit generator SHIPPED (2026-07-13)**: spec `docs/JOBDASH-005-kit-generator.md`. `lib/llm-cli.ts` (generic `claude -p` runner; email llm.ts refactored onto it), `lib/kit/` (text pure-helpers + JD fetch + playwright-core@1.61.1-EXACT PDF + generate orchestrator w/ truth constraint + one-page condense retry), `POST /api/kit/[id]` (SYNC_DISABLED→501), `GET /api/kit/[id]/[file]` allowlisted, KitGenerator button in detail-page Documents card. Sets resume_variant/cover_path/is_kit_ready + activity. kits/ gitignored. Base resume: KIT_BASE_RESUME env → default Pranav-Resume-2026-07-12.html. Live-verified WeFlow 3m45s, 1-page CV, 46/46 tests. Delta 17.
 
+**JOBDASH-005 v1.1 grader + v1.2 Kit Studio SHIPPED (2026-07-13)**: CV grader (kit_grade/kit_graded_at cols — Turso MIGRATED with Pranav's OK; KitGradeCard on detail page; CV score on kit_ready queue card; feedback loop: prior improvements steer the next generation). Kit Studio at `/studio` (nav + G S): scout-job picker or pasted JD → create/reuse card → generate humanized CV+cover → grade → refine to target (max 2 rounds). Kit CLI calls 480s (email stays 300s); llm-cli unwraps CLI error envelopes (429 session-limit reads human). PENDING: one full-loop live studio run — blocked by subscription session window (resets 16:30 Berlin 2026-07-13); everything below the LLM call verified. Deltas 18–19.
+
 ## NEXT — JOBDASH-004: Apply-Click Lifecycle & Auto-Reconcile (P0 CONFIRMED 2026-07-13, start here after /clear)
 
 **Spec = source of truth: `docs/JOBDASH-004-apply-lifecycle.md`** — full config, 10-transition
