@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { runSync } from "@/lib/email/sync";
+import { checkAllPostings, type PostingCheckStats } from "@/lib/posting-check";
 
 /** POST /api/sync — run the Gmail sync pipeline. Used by the Sync button (P4) and CLI/tests. */
 export async function POST() {
@@ -13,7 +14,15 @@ export async function POST() {
   }
   try {
     const stats = await runSync();
-    return NextResponse.json({ ok: true, ...stats });
+    // Piggyback the posting-expiry watchdog on the daily sync ritual;
+    // a probe failure must never fail the email sync itself.
+    let postings: PostingCheckStats | null = null;
+    try {
+      postings = await checkAllPostings();
+    } catch {
+      postings = null;
+    }
+    return NextResponse.json({ ok: true, ...stats, postings });
   } catch (err) {
     return NextResponse.json(
       { ok: false, error: err instanceof Error ? err.message : "sync failed" },

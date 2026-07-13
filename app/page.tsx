@@ -15,6 +15,7 @@ import { StatTile } from "@/components/stat-tile";
 import { ActionQueue } from "@/components/action-queue";
 import { ActivityIcon } from "@/components/activity-icon";
 import { SyncButton } from "@/components/proposal-review";
+import { CheckPostingsButton } from "@/components/check-postings-button";
 import { fmtRelative } from "@/lib/format";
 
 export default async function CommandPage() {
@@ -128,7 +129,10 @@ export default async function CommandPage() {
               </Link>
             )}
           </p>
-          <SyncButton compact />
+          <div className="flex shrink-0 items-center gap-1.5">
+            <CheckPostingsButton compact />
+            <SyncButton compact />
+          </div>
         </div>
       </section>
 
