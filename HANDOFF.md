@@ -27,7 +27,9 @@
 
 **P5 + Phase 6 FINAL GATE PASSED (2026-07-12).** Polish: G-chords (G C/P/A/I/E + nav kbd hints), board arrow moves (hover/focus, aria-labeled), mount motion w/ motion-reduce, mobile verified. Verification: `npm run build` ✓, Playwright smoke (5 pages × desktop+mobile, chord + arrow interaction tests, zero console/network errors) ✓, qa-runner 32/32 (vitest bootstrapped; real DB checksum-verified untouched) ✓, code-reviewer 2 blockers → fixed (`lib/email/privacy.ts` §8 scrub choke point + historical-rejection guard) → re-verified 0 BLOCKERS ✓. Repo is now git (repo-local identity, 3+ commits). Deltas 1–12 in EVOLUTION.md.
 
-## NEXT — JOBDASH-003: Vercel migration (APPROVED by Pranav 2026-07-12, start here after /clear)
+**Posting-expiry watchdog SHIPPED (2026-07-13)**: `lib/posting-verdict.ts` (pure per-ATS rules: Ashby og:title, join.com `__NEXT_DATA__` status — its i18n bundle contains tombstone text on EVERY page, never text-match; SmartRecruiters public API 200/404; ambiguous = unknown = no-op) + `lib/posting-check.ts` (auto-move dead postings → expired_missed w/ evidence activity) + `POST /api/check-postings` (works on Vercel too) + piggyback in `/api/sync` + Command Center "Check postings" button. 40/40 tests. Live-verified: dead Tacto Ashby posting (HTTP 200!) auto-moved to Missed; WeFlow/Kadmos live; idempotent. Delta 16.
+
+## NEXT — JOBDASH-003: Vercel migration — COMPLETED 2026-07-12 (see deltas 13–15; live at scout-dashboard-nine-ruby.vercel.app). Original ticket kept below for reference.
 
 **Goal**: dashboard usable on Pranav's phone anywhere (Mac asleep OK) at a Vercel URL behind a password. Email sync STAYS on the Mac at $0 (claude-cli transport), writing to the cloud DB.
 
