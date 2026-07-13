@@ -30,12 +30,27 @@ export function runClaudeCli(
     });
     child.on("close", (code) => {
       clearTimeout(timer);
-      if (code !== 0) reject(new Error(`claude -p exited ${code}: ${err || out}`));
+      if (code !== 0) reject(new Error(cliErrorMessage(code, err, out)));
       else resolve(out);
     });
     child.stdin.write(stdinInput);
     child.stdin.end();
   });
+}
+
+/** Human-readable failure: unwrap the CLI's JSON error envelope when present
+ * (e.g. subscription session limits come back as a 429 envelope with a plain
+ * "resets at …" message in .result). */
+function cliErrorMessage(code: number | null, stderr: string, stdout: string): string {
+  try {
+    const envelope = JSON.parse(stdout) as { is_error?: boolean; result?: string };
+    if (envelope.is_error && typeof envelope.result === "string" && envelope.result.trim()) {
+      return `Claude CLI: ${envelope.result.trim()}`;
+    }
+  } catch {
+    // not an envelope — fall through to the raw output
+  }
+  return `claude -p exited ${code}: ${stderr || stdout}`;
 }
 
 export interface ClaudePromptOptions {

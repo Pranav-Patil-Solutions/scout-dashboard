@@ -21,6 +21,8 @@ import { clampText, companySlug, extractHtmlDocument, htmlToText } from "./text"
  */
 
 const MODEL = "claude-sonnet-5";
+// full-document generation regularly outruns the email pipeline's 300s default
+const KIT_CLI_TIMEOUT_MS = 480_000;
 const DEFAULT_BASE_RESUME =
   "/Users/pranavpatil/Downloads/pranav-essentials/C--Users-Pranav/linkedin-improvement/Pranav-Resume-2026-07-12.html";
 
@@ -33,12 +35,14 @@ const RESUME_SYSTEM = `You tailor an existing HTML resume to a specific job post
 - Keep the base resume's <style> block, @page rules, and structural markup EXACTLY as given. You may only change text content, reorder bullets/skills, and delete the least relevant bullets.
 - NEVER invent employers, job titles, dates, degrees, certifications, tools, languages, or metrics that are not in the base resume. Re-phrasing, re-ordering, emphasizing, and cutting are allowed; fabricating is not.
 - Retarget the professional title line and summary to the target role using the job description's own vocabulary where it truthfully applies.
-- The result must fit ONE A4 page with the given CSS — prefer cutting the least relevant bullets over shrinking anything.`;
+- The result must fit ONE A4 page with the given CSS — prefer cutting the least relevant bullets over shrinking anything.
+- Write like a strong human writer, not an AI: plain verbs, concrete nouns, real numbers, varied sentence rhythm. Banned words/phrases: leverage(d), spearheaded, passionate, dynamic, synergy, results-driven, proven track record, utilize, delve, showcase, cutting-edge, fast-paced environment. No keyword stuffing — a JD keyword may appear only where an underlying fact truthfully supports it.`;
 
 const COVER_SYSTEM = `You write a one-page cover letter as a complete HTML document. Hard rules:
 - Output ONLY a complete HTML document (doctype to </html>). No prose around it, no markdown fences.
 - Use the exact <style> skeleton provided in the prompt (A4 @page, same typography family as the resume).
 - 250–320 words of body text. Direct, specific, zero clichés ("I am writing to express…" is banned). Open with a concrete hook tying the candidate's strongest relevant result to what the company is building; close with a plain call to action.
+- Humanize the voice: contractions are welcome, one idea per sentence, varied sentence length, no three-part parallel flourishes, no em-dash chains. Banned words: leverage(d), spearheaded, passionate, dynamic, synergy, results-driven, proven track record, utilize, delve, showcase, cutting-edge, thrilled, excited.
 - Ground EVERY claim in the resume facts provided. Never invent experience, employers, metrics, or language skills. German level is A2 (basic) — never overstate it.
 - Sign off "Pranav Patil" with the contact line from the resume facts. Address the hiring team of the given company; use today's date and the location line "Berlin, Germany".`;
 
@@ -155,13 +159,23 @@ export async function generateKit(appId: string): Promise<KitResult> {
 
   // 1 · tailored resume, with one condense retry if it overflows one page
   let resumeHtml = extractHtmlDocument(
-    await claudePrompt({ model: MODEL, system: RESUME_SYSTEM, prompt: resumePrompt(baseHtml, jd, target) }),
+    await claudePrompt({
+      model: MODEL,
+      system: RESUME_SYSTEM,
+      prompt: resumePrompt(baseHtml, jd, target),
+      timeoutMs: KIT_CLI_TIMEOUT_MS,
+    }),
   );
   let resumePdf = await renderPdf(resumeHtml);
   let resumePages = await pdfPageCount(resumePdf);
   if (resumePages > 1) {
     resumeHtml = extractHtmlDocument(
-      await claudePrompt({ model: MODEL, system: RESUME_SYSTEM, prompt: condensePrompt(resumeHtml) }),
+      await claudePrompt({
+        model: MODEL,
+        system: RESUME_SYSTEM,
+        prompt: condensePrompt(resumeHtml),
+        timeoutMs: KIT_CLI_TIMEOUT_MS,
+      }),
     );
     resumePdf = await renderPdf(resumeHtml);
     resumePages = await pdfPageCount(resumePdf);
@@ -179,6 +193,7 @@ export async function generateKit(appId: string): Promise<KitResult> {
       model: MODEL,
       system: COVER_SYSTEM,
       prompt: coverPrompt(clampText(htmlToText(baseHtml), 8_000), jd, target, dateLine),
+      timeoutMs: KIT_CLI_TIMEOUT_MS,
     }),
   );
   const coverPdf = await renderPdf(coverHtml);

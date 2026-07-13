@@ -74,3 +74,20 @@ regeneration history/versioning.
 - Schema: migration `drizzle/0003` (additive ADD COLUMN ×2). Applied to the local file DB;
   **Turso needs `npx tsx --env-file=.env.local scripts/migrate.ts` run by Pranav** (prod-DB gate),
   THEN restart the Mac server — the new build selects kit_grade and errors on an unmigrated DB.
+
+## v1.2 — Kit Studio (2026-07-13, Pranav: "standalone resume builder … humanise … compare with the JD for each job in job scout … aim accuracy")
+
+- `/studio` page (nav "Kit Studio", chord G S): pick a NEW Scout Inbox job OR paste any JD
+  (company/role/JD text/optional URL) + target score (75/80/85, default 80).
+- `POST /api/studio`: scout job → createApplication (promotes the scout row, reuses the card if
+  already promoted); pasted JD → createApplication with JD stored in notes (resolveJd's fallback).
+  Then `lib/kit/refine.ts` generateKitToTarget: generate → grade → if overall < target and rounds
+  remain (max 2, clamp 1–3), regenerate — each round auto-consumes the previous grade's
+  improvements. Returns rounds trajectory + final grade + files. Mac-only (SYNC_DISABLED guard).
+- **Humanize rules** added to BOTH prompts (all kit generation, not just studio): plain verbs,
+  varied rhythm, contractions OK; banned AI-tells (leveraged, spearheaded, passionate, dynamic,
+  synergy, results-driven, proven track record, utilize, delve, showcase, cutting-edge…); no
+  keyword stuffing — a JD keyword may appear only where a real fact supports it. Truth constraint
+  unchanged.
+- Result panel: score + verdict + round trajectory + CV/cover PDF links + link to the application
+  card (kit_ready arms as usual, so the Command Center picks it up).
