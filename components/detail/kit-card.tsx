@@ -5,6 +5,7 @@ import { useState } from "react";
 import { FileText, Loader2, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { fetchJson } from "@/lib/fetch-json";
 
 /**
  * Generate/Regenerate a tailored CV + cover letter (JOBDASH-005) and link the
@@ -18,25 +19,36 @@ export function KitGenerator({ appId, hasKit }: { appId: string; hasKit: boolean
   async function run() {
     setRunning(true);
     try {
-      const res = await fetch(`/api/kit/${appId}`, { method: "POST" });
-      const body = (await res.json()) as {
+      const body = await fetchJson<{
         ok: boolean;
         error?: string;
+        target?: number;
+        reachedTarget?: boolean;
         resumePages?: number;
         warnings?: string[];
         grade?: { overall: number; verdict: string } | null;
-      };
+      }>(`/api/kit/${appId}`, { method: "POST" });
       if (!body.ok) throw new Error(body.error ?? "kit generation failed");
-      toast.success(
-        body.grade
-          ? `Kit ready — CV graded ${body.grade.overall}/100`
-          : "Kit ready — CV + cover letter generated",
-        {
-          description: body.warnings?.length
-            ? body.warnings.join(" · ")
-            : (body.grade?.verdict ?? "One-page CV tailored to the posting. Kit ready is now ON."),
-        },
-      );
+      // THE BAR (v1.2.1): a graded-but-below-target kit stays readable but is
+      // NOT marked ready — say so instead of a false "Kit ready". A kit whose
+      // grading failed (grade null) is not demoted, so it takes the ready path.
+      if (body.grade && body.reachedTarget === false) {
+        toast.warning(
+          `Graded ${body.grade.overall}/100 — below your ${body.target ?? 80} bar, kit not marked ready`,
+          { description: body.grade.verdict ?? "Regenerate or edit the CV, then re-grade." },
+        );
+      } else {
+        toast.success(
+          body.grade
+            ? `Kit ready — CV graded ${body.grade.overall}/100`
+            : "Kit ready — CV + cover letter generated",
+          {
+            description: body.warnings?.length
+              ? body.warnings.join(" · ")
+              : (body.grade?.verdict ?? "One-page CV tailored to the posting. Kit ready is now ON."),
+          },
+        );
+      }
       router.refresh();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Kit generation failed.");
@@ -58,7 +70,7 @@ export function KitGenerator({ appId, hasKit }: { appId: string; hasKit: boolean
       >
         {running ? (
           <>
-            <Loader2 className="size-3.5 animate-spin" /> Generating… ~2 min
+            <Loader2 className="size-3.5 animate-spin" /> Generating… ~2–9 min
           </>
         ) : (
           <>

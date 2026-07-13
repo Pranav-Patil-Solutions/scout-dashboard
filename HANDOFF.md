@@ -33,6 +33,17 @@
 
 **JOBDASH-005 v1.1 grader + v1.2 Kit Studio SHIPPED (2026-07-13)**: CV grader (kit_grade/kit_graded_at cols — Turso MIGRATED with Pranav's OK; KitGradeCard on detail page; CV score on kit_ready queue card; feedback loop: prior improvements steer the next generation). Kit Studio at `/studio` (nav + G S): scout-job picker or pasted JD → create/reuse card → generate humanized CV+cover → grade → refine to target (max 2 rounds). Kit CLI calls 480s (email stays 300s); llm-cli unwraps CLI error envelopes (429 session-limit reads human). PENDING: one full-loop live studio run — blocked by subscription session window (resets 16:30 Berlin 2026-07-13); everything below the LLM call verified. Deltas 18–19.
 
+## JOBDASH-005 v1.2.1 SHIPPED (2026-07-14) — keep-best + THE BAR + fetchJson
+
+User ask (DONE): fix Safari "string did not match the expected pattern" on Regenerate + never mark a kit ready below 80.
+
+- `lib/kit/refine.ts` keep-best snapshot/restore (kits/<id>/rounds/round-N) + THE BAR (below-target → isKitReady=false + activity; grade-failed/null NOT demoted); `lib/kit/grade.ts` persistGrade export; `lib/fetch-json.ts` (network + non-JSON → human message).
+- `app/api/kit/[id]/route.ts` POST now runs `generateKitToTarget(id, {target: body?.target ?? 80, maxRounds: body?.maxRounds ?? 2})` with tolerant body parse; returns rounds/keptRound/reachedTarget/grade/target. Detail-card Regenerate button now gets keep-best + THE BAR + the below-bar toast; "~2 min" hint → "~2–9 min".
+- `fetchJson` wired into kit-card.tsx (+below-bar toast "Graded N/100 — below your 80 bar, kit not marked ready"), kit-grade.tsx, studio-form.tsx. studio route/form already return+show keptRound.
+- Gate: tsc 0 · 53/53 tests · `next build` green · prod restarted on 3312 (LAN) · /studio + detail 200. EVOLUTION delta 20. Committed + preview redeployed (`vercel`).
+- **Open (needs Pranav):** `git push` (now 9+ commits ahead) so prod/phone at scout-dashboard-nine-ruby get the fix. **Honest gap:** end-to-end keep-best live run blocked AGAIN by the CLI session window (scratchpad studio-run5.json = `session limit · resets 10:30pm Berlin`, zero rounds) — logic is code-complete + gate-green but the 2-round regression not re-observed live; run one Kit Studio build after 22:30 Berlin to confirm restore + below-bar demote.
+- **NOT wired (deliberate, out of ticket scope):** `components/proposal-review.tsx` + `components/check-postings-button.tsx` still use raw `res.json()` — same Safari exposure on the sync/postings paths; fold into a future pass if it recurs there.
+
 ## NEXT — JOBDASH-004: Apply-Click Lifecycle & Auto-Reconcile (P0 CONFIRMED 2026-07-13, start here after /clear)
 
 **Spec = source of truth: `docs/JOBDASH-004-apply-lifecycle.md`** — full config, 10-transition

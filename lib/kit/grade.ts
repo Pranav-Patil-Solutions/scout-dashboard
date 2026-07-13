@@ -33,6 +33,35 @@ Improvements must be ACTIONABLE and TRUTH-PRESERVING: reframing, reordering, emp
 Respond with ONLY a raw JSON object — no markdown fences, no prose — shaped exactly:
 {"overall": number, "subscores": {"keywords": number, "experience": number, "seniority": number, "evidence": number}, "matched_keywords": string[], "missing_keywords": string[], "red_flags": string[], "improvements": string[] (3-8 items), "verdict": "one sentence"}`;
 
+/** Write a grade to the card + timeline. Deliberately does NOT bump
+ * lastActivityAt — grading is bookkeeping, not correspondence, and must not
+ * silence the overdue/silent-days alerts. Also used by the refine loop when
+ * restoring the best round. */
+export async function persistGrade(
+  appId: string,
+  grade: KitGrade,
+  activityTitle: string,
+): Promise<void> {
+  const now = new Date();
+  await db
+    .update(applications)
+    .set({ kitGrade: grade, kitGradedAt: now, updatedAt: now })
+    .where(eq(applications.id, appId))
+    .run();
+  await db
+    .insert(activities)
+    .values({
+      id: randomUUID(),
+      applicationId: appId,
+      type: "note",
+      title: activityTitle,
+      body: grade.verdict,
+      occurredAt: now,
+      source: "system",
+    })
+    .run();
+}
+
 export async function gradeKit(appId: string, opts: { jd?: string } = {}): Promise<KitGrade> {
   const app = await db.select().from(applications).where(eq(applications.id, appId)).get();
   if (!app) throw new Error("Application not found");
@@ -77,26 +106,7 @@ Grade the resume now.`;
         graded_at: new Date().toISOString(),
         model: MODEL,
       };
-      const now = new Date();
-      // deliberately NOT bumping lastActivityAt — grading is bookkeeping, not
-      // correspondence, and must not silence the overdue/silent-days alerts
-      await db
-        .update(applications)
-        .set({ kitGrade: grade, kitGradedAt: now, updatedAt: now })
-        .where(eq(applications.id, appId))
-        .run();
-      await db
-        .insert(activities)
-        .values({
-          id: randomUUID(),
-          applicationId: appId,
-          type: "note",
-          title: `CV graded ${grade.overall}/100 vs live posting`,
-          body: grade.verdict,
-          occurredAt: now,
-          source: "system",
-        })
-        .run();
+      await persistGrade(appId, grade, `CV graded ${grade.overall}/100 vs live posting`);
       return grade;
     } catch (e) {
       lastError = e instanceof Error ? e.message : String(e);

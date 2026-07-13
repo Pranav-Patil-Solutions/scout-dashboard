@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { ArrowUpRight, ClipboardPaste, FileText, Inbox, Loader2, Wand2 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { fetchJson } from "@/lib/fetch-json";
 import { gradeTone, type KitGrade } from "@/lib/kit/grade-schema";
 import { FitChip } from "@/components/chips";
 import type { ScoutJob } from "@/lib/db/schema";
@@ -18,6 +19,7 @@ interface StudioResponse {
   error?: string;
   applicationId?: string;
   rounds?: Array<{ overall: number | null; verdict: string | null }>;
+  keptRound?: number;
   reachedTarget?: boolean;
   grade?: KitGrade | null;
 }
@@ -59,12 +61,11 @@ export function StudioForm({ jobs }: { jobs: ScoutJob[] }) {
         mode === "scout"
           ? { scoutJobId, target }
           : { manual: { company, roleTitle, jd, applyUrl }, target };
-      const res = await fetch("/api/studio", {
+      const body = await fetchJson<StudioResponse>("/api/studio", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(payload),
       });
-      const body = (await res.json()) as StudioResponse;
       if (!body.ok) throw new Error(body.error ?? "studio run failed");
       setResult(body);
       toast.success(
@@ -246,7 +247,8 @@ export function StudioForm({ jobs }: { jobs: ScoutJob[] }) {
                 {result.reachedTarget ? "Target reached" : "Best effort (target missed)"}
                 {result.rounds && result.rounds.length > 1 && (
                   <span className="tnum ml-2 font-normal text-ink-3">
-                    {result.rounds.map((r) => r.overall ?? "—").join(" → ")}
+                    {result.rounds.map((r) => r.overall ?? "—").join(" → ")} · kept round{" "}
+                    {result.keptRound} (best)
                   </span>
                 )}
               </p>

@@ -122,6 +122,7 @@ export async function POST(req: Request) {
       ok: true,
       applicationId,
       rounds: result.rounds,
+      keptRound: result.keptRound,
       reachedTarget: result.reachedTarget,
       grade: result.final.grade,
       resumeVariant: result.final.resumeVariant,

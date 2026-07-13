@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { gradeTone, type KitGrade } from "@/lib/kit/grade-schema";
 import { fmtRelative } from "@/lib/format";
+import { fetchJson } from "@/lib/fetch-json";
 
 /**
  * CV Grade card (JOBDASH-005 v1.1) — relatability score vs the live posting,
@@ -36,8 +37,10 @@ export function KitGradeCard({
   async function regrade() {
     setRunning(true);
     try {
-      const res = await fetch(`/api/kit/${appId}/grade`, { method: "POST" });
-      const body = (await res.json()) as { ok: boolean; error?: string; grade?: KitGrade };
+      const body = await fetchJson<{ ok: boolean; error?: string; grade?: KitGrade }>(
+        `/api/kit/${appId}/grade`,
+        { method: "POST" },
+      );
       if (!body.ok) throw new Error(body.error ?? "grading failed");
       toast.success(`CV graded ${body.grade?.overall}/100`, {
         description: body.grade?.verdict,
