@@ -7,6 +7,7 @@ import { db } from "../db";
 import { activities, applications, type Application } from "../db/schema";
 import { GERMAN_REQ_META, type GermanReq } from "../constants";
 import { claudePrompt } from "../llm-cli";
+import type { KitGrade } from "./grade-schema";
 import { fetchJobDescription } from "./jd";
 import { renderPdf, pdfPageCount } from "./pdf";
 import { clampText, companySlug, extractHtmlDocument, htmlToText } from "./text";
@@ -94,6 +95,7 @@ export interface KitResult {
   resumePages: number;
   warnings: string[];
   files: string[];
+  grade: KitGrade | null;
 }
 
 async function loadApp(appId: string): Promise<Application> {
@@ -106,12 +108,10 @@ async function loadApp(appId: string): Promise<Application> {
   return app;
 }
 
-export async function generateKit(appId: string): Promise<KitResult> {
-  const app = await loadApp(appId);
-  const basePath = process.env.KIT_BASE_RESUME ?? DEFAULT_BASE_RESUME;
-  const baseHtml = await readFile(basePath, "utf-8");
-
-  // JD: live posting text, falling back to the card's notes.
+/** JD text: the live posting, falling back to the card's notes (shared with the grader). */
+export async function resolveJd(
+  app: Pick<Application, "jdUrl" | "applyUrl" | "notes">,
+): Promise<string> {
   let jd = "";
   const jdSource = app.jdUrl || app.applyUrl;
   if (jdSource) {
@@ -126,16 +126,30 @@ export async function generateKit(appId: string): Promise<KitResult> {
     throw new Error(
       "No job description available — add a JD/apply URL that still resolves, or paste the JD into Notes.",
     );
+  return jd;
+}
+
+export async function generateKit(appId: string): Promise<KitResult> {
+  const app = await loadApp(appId);
+  const basePath = process.env.KIT_BASE_RESUME ?? DEFAULT_BASE_RESUME;
+  const baseHtml = await readFile(basePath, "utf-8");
+  const jd = await resolveJd(app);
 
   const german = GERMAN_REQ_META[app.germanReq as GermanReq]?.label ?? app.germanReq;
-  const target = [
-    `Company: ${app.company}`,
-    `Role: ${app.roleTitle}`,
-    app.location ? `Location: ${app.location}` : null,
-    `German requirement: ${german} (candidate is A2 — position accordingly, never overstate)`,
-  ]
-    .filter(Boolean)
-    .join("\n");
+  // Feedback loop (v1.1): the previous grade's improvements steer this run.
+  const prior = app.kitGrade as KitGrade | null;
+  const feedback = prior?.improvements?.length
+    ? `\n\nPRIOR GRADER FEEDBACK on the last version of this kit — address each point truthfully where possible (reframe/reorder/emphasize existing facts only, never fabricate):\n${prior.improvements.map((s, i) => `${i + 1}. ${s}`).join("\n")}`
+    : "";
+  const target =
+    [
+      `Company: ${app.company}`,
+      `Role: ${app.roleTitle}`,
+      app.location ? `Location: ${app.location}` : null,
+      `German requirement: ${german} (candidate is A2 — position accordingly, never overstate)`,
+    ]
+      .filter(Boolean)
+      .join("\n") + feedback;
 
   const warnings: string[] = [];
 
@@ -203,11 +217,21 @@ export async function generateKit(appId: string): Promise<KitResult> {
     })
     .run();
 
+  // 4 · grade the fresh kit vs the same JD (non-fatal — the kit stands either way)
+  let grade: KitGrade | null = null;
+  try {
+    const { gradeKit } = await import("./grade");
+    grade = await gradeKit(app.id, { jd });
+  } catch {
+    warnings.push("grading failed — press Grade CV on the card to retry");
+  }
+
   return {
     dir,
     resumeVariant,
     resumePages,
     warnings,
     files: ["resume.pdf", "resume.html", "cover-letter.pdf", "cover-letter.html"],
+    grade,
   };
 }

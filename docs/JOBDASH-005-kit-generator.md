@@ -57,3 +57,20 @@ Mac prod server.
 ## §9 Out of scope (v1)
 Editing generated docs in-app · DOCX output · auto-attach to applications · German-language covers ·
 regeneration history/versioning.
+
+## v1.1 — CV Grader (2026-07-13, Pranav: "add resume grader … improve it for next time … show on dashboard")
+
+- `lib/kit/grade-schema.ts` (pure: KitGrade type, validate/clamp, extractJsonObject, gradeTone) +
+  `lib/kit/grade.ts` (Sonnet 5 recruiter+ATS grade of kits/<id>/resume.html vs the live JD; one
+  retry; writes `applications.kit_grade` JSON + `kit_graded_at` + activity; deliberately does NOT
+  bump last_activity_at so silent-days alerts stay honest).
+- Grade = overall 0–100 + subscores (keywords/experience/seniority/evidence) + matched/missing
+  keywords + red_flags + improvements + verdict. Improvements are truth-preserving only.
+- **Feedback loop**: generateKit() appends the previous grade's improvements to the tailoring
+  prompt ("PRIOR GRADER FEEDBACK") — Regenerate is self-improving.
+- Auto-grade runs at the end of every generation (non-fatal); `POST /api/kit/[id]/grade` re-grades
+  on demand. UI: KitGradeCard on the detail page (score, bars, keyword chips, "For next time"),
+  CV score on the Command Center kit_ready card.
+- Schema: migration `drizzle/0003` (additive ADD COLUMN ×2). Applied to the local file DB;
+  **Turso needs `npx tsx --env-file=.env.local scripts/migrate.ts` run by Pranav** (prod-DB gate),
+  THEN restart the Mac server — the new build selects kit_grade and errors on an unmigrated DB.

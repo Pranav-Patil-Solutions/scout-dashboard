@@ -11,6 +11,8 @@ import { Timeline } from "@/components/detail/timeline";
 import { NextActionCard } from "@/components/detail/next-action-card";
 import { EditButton } from "@/components/detail/edit-button";
 import { KitGenerator } from "@/components/detail/kit-card";
+import { KitGradeCard } from "@/components/detail/kit-grade";
+import type { KitGrade } from "@/lib/kit/grade-schema";
 import {
   GERMAN_REQ_META,
   SENIORITY,
@@ -233,6 +235,13 @@ export default async function ApplicationDetailPage({
             </div>
             <KitGenerator appId={app.id} hasKit={hasKit} />
           </section>
+
+          {/* CV grade vs the live posting (JOBDASH-005 v1.1) */}
+          <KitGradeCard
+            appId={app.id}
+            grade={(app.kitGrade as KitGrade | null) ?? null}
+            hasKit={hasKit}
+          />
 
           {/* Next action */}
           <NextActionCard

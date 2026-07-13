@@ -22,6 +22,13 @@
       "when": 1783773291219,
       "tag": "0002_first_demogoblin",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1783941119833,
+      "tag": "0003_nostalgic_boomer",
+      "breakpoints": true
     }
   ]
 }

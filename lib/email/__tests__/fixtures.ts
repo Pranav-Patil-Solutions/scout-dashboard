@@ -33,6 +33,8 @@ export function makeApp(overrides: Partial<Application> = {}): Application {
     nextAction: null,
     nextActionDue: null,
     snoozedUntil: null,
+    kitGrade: null,
+    kitGradedAt: null,
     closedReason: null,
     closedAt: null,
     notes: null,

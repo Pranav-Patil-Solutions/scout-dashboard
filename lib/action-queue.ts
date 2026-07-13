@@ -50,11 +50,12 @@ export function buildActionQueue(apps: Application[], now = new Date()): ActionI
     if (app.status !== "to_apply" && app.status !== "sourced") continue;
     if (snoozed(app, now)) continue;
     const waited = differenceInCalendarDays(now, app.lastActivityAt ?? app.createdAt);
+    const cvGrade = (app.kitGrade as { overall?: number } | null)?.overall;
     items.push({
       kind: "kit_ready",
       app,
       title: "Kit ready — not sent",
-      detail: `${app.resumeVariant ?? "Kit"} prepared ${waited <= 0 ? "today" : `${waited}d ago`} · fit ${app.fitScore ?? "—"}`,
+      detail: `${app.resumeVariant ?? "Kit"} prepared ${waited <= 0 ? "today" : `${waited}d ago`} · fit ${app.fitScore ?? "—"}${typeof cvGrade === "number" ? ` · CV ${cvGrade}/100` : ""}`,
       rank: 100 - (app.fitScore ?? 0),
     });
     claimed.add(app.id);

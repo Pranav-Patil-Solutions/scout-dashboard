@@ -45,6 +45,8 @@ export const applications = sqliteTable(
     nextAction: text("next_action"),
     nextActionDue: integer("next_action_due", { mode: "timestamp" }),
     snoozedUntil: integer("snoozed_until", { mode: "timestamp" }), // hides Action Queue cards until this passes
+    kitGrade: text("kit_grade", { mode: "json" }), // JOBDASH-005 grader output (KitGrade)
+    kitGradedAt: integer("kit_graded_at", { mode: "timestamp" }),
     // rejected | withdrawn | expired_missed | offer_declined | hired
     closedReason: text("closed_reason"),
     closedAt: integer("closed_at", { mode: "timestamp" }), // §4 addition — makes time-to-rejection computable

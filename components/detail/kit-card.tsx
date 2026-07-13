@@ -24,13 +24,19 @@ export function KitGenerator({ appId, hasKit }: { appId: string; hasKit: boolean
         error?: string;
         resumePages?: number;
         warnings?: string[];
+        grade?: { overall: number; verdict: string } | null;
       };
       if (!body.ok) throw new Error(body.error ?? "kit generation failed");
-      toast.success("Kit ready — CV + cover letter generated", {
-        description: body.warnings?.length
-          ? body.warnings.join(" · ")
-          : "One-page CV tailored to the posting. Kit ready is now ON.",
-      });
+      toast.success(
+        body.grade
+          ? `Kit ready — CV graded ${body.grade.overall}/100`
+          : "Kit ready — CV + cover letter generated",
+        {
+          description: body.warnings?.length
+            ? body.warnings.join(" · ")
+            : (body.grade?.verdict ?? "One-page CV tailored to the posting. Kit ready is now ON."),
+        },
+      );
       router.refresh();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Kit generation failed.");
