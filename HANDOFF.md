@@ -29,6 +29,8 @@
 
 **Posting-expiry watchdog SHIPPED (2026-07-13)**: `lib/posting-verdict.ts` (pure per-ATS rules: Ashby og:title, join.com `__NEXT_DATA__` status — its i18n bundle contains tombstone text on EVERY page, never text-match; SmartRecruiters public API 200/404; ambiguous = unknown = no-op) + `lib/posting-check.ts` (auto-move dead postings → expired_missed w/ evidence activity) + `POST /api/check-postings` (works on Vercel too) + piggyback in `/api/sync` + Command Center "Check postings" button. 40/40 tests. Live-verified: dead Tacto Ashby posting (HTTP 200!) auto-moved to Missed; WeFlow/Kadmos live; idempotent. Delta 16.
 
+**JOBDASH-005 kit generator SHIPPED (2026-07-13)**: spec `docs/JOBDASH-005-kit-generator.md`. `lib/llm-cli.ts` (generic `claude -p` runner; email llm.ts refactored onto it), `lib/kit/` (text pure-helpers + JD fetch + playwright-core@1.61.1-EXACT PDF + generate orchestrator w/ truth constraint + one-page condense retry), `POST /api/kit/[id]` (SYNC_DISABLED→501), `GET /api/kit/[id]/[file]` allowlisted, KitGenerator button in detail-page Documents card. Sets resume_variant/cover_path/is_kit_ready + activity. kits/ gitignored. Base resume: KIT_BASE_RESUME env → default Pranav-Resume-2026-07-12.html. Live-verified WeFlow 3m45s, 1-page CV, 46/46 tests. Delta 17.
+
 ## NEXT — JOBDASH-004: Apply-Click Lifecycle & Auto-Reconcile (P0 CONFIRMED 2026-07-13, start here after /clear)
 
 **Spec = source of truth: `docs/JOBDASH-004-apply-lifecycle.md`** — full config, 10-transition
