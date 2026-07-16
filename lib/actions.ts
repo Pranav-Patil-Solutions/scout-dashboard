@@ -2,7 +2,7 @@
 
 import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
-import { eq } from "drizzle-orm";
+import { and, eq, ne } from "drizzle-orm";
 import { db } from "./db";
 import { activities, applications, scoutJobs, type Application } from "./db/schema";
 import { CLOSED_STATUSES, deriveFitBand, statusMeta, type Status } from "./constants";
@@ -139,6 +139,24 @@ export async function applyToScoutJob(
 
   if (job.status === "promoted" && job.promotedApplicationId) {
     return { id: job.promotedApplicationId, url: job.url ?? null, reused: true };
+  }
+
+  // Atomically claim the scout job before creating the application. This
+  // UPDATE only succeeds if the row is still not `promoted`, so a duplicate
+  // apply (double-click / repeated keypress racing this same function) can
+  // never create two applications for one scout job — the loser re-reads
+  // and reuses whichever application the winner created.
+  const claim = await db
+    .update(scoutJobs)
+    .set({ status: "promoted" })
+    .where(and(eq(scoutJobs.id, scoutJobId), ne(scoutJobs.status, "promoted")))
+    .run();
+  if (claim.rowsAffected === 0) {
+    const fresh = await db.select().from(scoutJobs).where(eq(scoutJobs.id, scoutJobId)).get();
+    if (fresh?.promotedApplicationId) {
+      return { id: fresh.promotedApplicationId, url: fresh.url ?? null, reused: true };
+    }
+    throw new Error("That role was just applied to elsewhere — refresh and try again.");
   }
 
   const { id } = await createApplication({

@@ -102,7 +102,9 @@ job queue) predates it and now effectively becomes JOBDASH-007 — renumber when
   fixture posting (load → entities decoded → copy → clipboard verified → cache hit on revisit, DB row
   stamped) · route 404/422/502 curl-verified · code-reviewer 0 BLOCKERS (2 of 3 nits fixed same-session:
   http(s)-only scheme guard in fetchJobDescription + Uint8Array blobs in backup-turso; 3rd accepted, see
-  Open items) · qa-runner 0 fails, 64/64 after its 4 entity tests + the scheme-guard test.
+  Open items) · qa-runner 0 fails, 64/64 after its 4 entity tests + the scheme-guard test. Post-gate
+  follow-up commit: reviewer's atomic-claim fix for the apply double-click race, live-verified via
+  Playwright apply-click on a seeded row (1 application, scout row promoted+linked, reuse view OK).
 
 ## NEXT — JOBDASH-006 §3/§4/§5 (await Pranav's OK on §1+§2 demo first)
 
@@ -183,7 +185,7 @@ GUARDS: never run destructive SQL against Turso without a fresh scoutdash.db bac
 
 ## Open items (non-blocking)
 
-- Ship-gate nits accepted as known: match.ts short-name containment (≥3 chars) can over-match; `claude -p` SIGKILL doesn't reap grandchildren; concurrent double-sync isn't locked; `applyToScoutJob` check-then-act isn't transactional (a sub-second double-click can double-insert; UI disables the button while pending — wrap in db.transaction if it ever bites).
+- Ship-gate nits accepted as known: match.ts short-name containment (≥3 chars) can over-match; `claude -p` SIGKILL doesn't reap grandchildren; concurrent double-sync isn't locked. (The `applyToScoutJob` double-insert race was FIXED post-gate by the reviewer: atomic claim `UPDATE … WHERE status != 'promoted'`; loser re-reads and reuses the winner's application. Known edge: if `createApplication` throws after a successful claim, the scout row is left `promoted` with no linked application — recover by setting its status back to `new` in the DB.)
 - Future: Gmail API source (replace .gmail-staging manual sweeps).
 
 ## GOTCHAS
