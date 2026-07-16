@@ -5,9 +5,27 @@ import { useRouter } from "next/navigation";
 import { Loader2, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { ActivityIcon } from "@/components/activity-icon";
+import { StatusBadge } from "@/components/chips";
 import { addActivity } from "@/lib/actions";
+import { STATUS_META } from "@/lib/constants";
 import { fmtDateTime } from "@/lib/format";
 import type { Activity } from "@/lib/db/schema";
+
+/** Status a status_change entry landed on — exact match against the title
+ * shapes our own writers produce (lib/actions.ts "Moved to X" / "Added to
+ * pipeline — X", lib/email/apply.ts "from → to (email sync)", posting-check's
+ * expiry line), so free-text notes can't false-positive. JOBDASH-006 §3. */
+function statusFromTitle(title: string | null): string | null {
+  if (!title) return null;
+  const sync = title.match(/^\S+ → (\S+) \(email sync\)$/);
+  if (sync) return sync[1] in STATUS_META ? sync[1] : null;
+  if (title === "Posting expired — auto-moved to Missed") return "expired_missed";
+  for (const meta of Object.values(STATUS_META)) {
+    if (title === `Moved to ${meta.label}` || title === `Added to pipeline — ${meta.label}`)
+      return meta.key;
+  }
+  return null;
+}
 
 const NOTE_TYPES = [
   { value: "note", label: "Note" },
@@ -91,13 +109,18 @@ export function Timeline({
             aria-hidden
             className="absolute bottom-5 left-[29.5px] top-5 w-px bg-hairline"
           />
-          {activities.map((a) => (
+          {activities.map((a) => {
+            const landedStatus = a.type === "status_change" ? statusFromTitle(a.title) : null;
+            return (
             <li key={a.id} className="relative flex gap-3 py-2.5">
               <span className="relative z-10">
                 <ActivityIcon type={a.type} size="sm" />
               </span>
               <div className="min-w-0 flex-1 pt-0.5">
-                <p className="text-[13px] leading-snug text-foreground">{a.title}</p>
+                <p className="flex flex-wrap items-center gap-2 text-[13px] leading-snug text-foreground">
+                  {a.title}
+                  {landedStatus && <StatusBadge status={landedStatus} size="sm" />}
+                </p>
                 {a.body && (
                   <p className="mt-0.5 text-[12px] leading-relaxed text-ink-2">{a.body}</p>
                 )}
@@ -107,7 +130,8 @@ export function Timeline({
                 </p>
               </div>
             </li>
-          ))}
+            );
+          })}
         </ul>
       )}
     </div>

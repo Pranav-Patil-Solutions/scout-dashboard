@@ -63,6 +63,18 @@ No failures — driver migration (better-sqlite3 → @libsql/client via drizzle-
 
 22. **An uncommitted gate is a debt the next session pays.** The Discover redesign passed its gate on 2026-07-15 but was left uncommitted; JOBDASH-006 §1+§2 then had to edit the same files (job-board.tsx, app-shell.tsx, actions.ts, triage/page.tsx), so the two shipped units are no longer separable into clean, bisectable commits — they land as one. Rule: a phase gate is not closed until its commit exists; commit before the session ends, even when the push waits for Pranav. Also hit: (a) **ticket-number collision** — an untracked draft `docs/JOBDASH-006-hybrid-worker.md` already claimed "JOBDASH-006" before this session's closed-loop apply-engine ticket reused the number; the hybrid-worker draft is now implicitly JOBDASH-007 — always grep docs/ for the ticket number before speccing. (b) **Playwright `requestfailed` fires for `net::ERR_ABORTED`**, which App-Router prefetches produce on every navigation — a "0 network errors" smoke bar must filter aborted requests (cancelled ≠ failed) or it drowns in 200+ false positives. (c) **No turso CLI on this Mac** — remote backup now has a permanent path: `scripts/backup-turso.ts` dumps schema+rows to a replayable `.sql` (named `scoutdash.db.turso-dump-*` so the existing gitignore glob covers it); the dump was restore-verified into a scratch sqlite before migrating. Shipped: root → `/triage` redirect (Command Center moved to `/command`, nav + G-C chord retargeted), `scout_jobs.jd_text/jd_fetched_at` (migration 0004 on Turso + local), `POST /api/scout-jd/[id]` (pure fetch → htmlToText → cache; 404/422/502 all human-messaged; NOT SYNC_DISABLED-guarded, works on Vercel), JdPanel in the Discover detail (load-on-click skeleton, pre-wrap scroll panel, Copy→clipboard toast, fetched-at stamp, "Open posting" anchor beside Apply), `applyToScoutJob` now stamps `jd_url` so kit generation reuses the posting, and htmlToText decodes numeric + common named entities (German postings: ü/ä/ö/ß/– render true in the panel, the clipboard, and kit JDs).
 
+## 2026-07-16 — JOBDASH-006 §3 (outcome chips)
+
+23. **A ticket can spec the architecturally impossible — say so instead of faking it.** §3's optional
+"live gmail-mcp-source implementing EmailSource using the authorized Gmail MCP connector" cannot exist:
+claude.ai MCP connectors are callable only from a Claude session, never from the Next.js runtime, so an
+ENABLE_GMAIL_MCP runtime source would have nothing to call. Logged the impossibility in HANDOFF and
+skipped it rather than building a stub that pretends. Rule: when a spec names an integration, verify the
+call is possible from the runtime that would make it BEFORE building the seam. Otherwise §3 was pure
+reuse (StatusBadge + one left join + exact-title chip derivation on the timeline) — no new failures; the
+smoke-locator lesson (a mounted-but-CSS-hidden duplicate detail pane needs `.filter({visible:true})`,
+positional `.first()/.last()` both break across viewports) is folded here for the next Playwright pass.
+
 ## 2026-07-14 — JOBDASH-005 v1.2.1 (keep-best + THE BAR + fetchJson)
 
 ## 2026-07-15 — Discover redesign (job-search surface → premium split master-detail + one-click apply)

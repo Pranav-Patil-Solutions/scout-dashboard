@@ -106,13 +106,40 @@ job queue) predates it and now effectively becomes JOBDASH-007 — renumber when
   follow-up commit: reviewer's atomic-claim fix for the apply double-click race, live-verified via
   Playwright apply-click on a seeded row (1 application, scout row promoted+linked, reuse view OK).
 
-## NEXT — JOBDASH-006 §3/§4/§5 (await Pranav's OK on §1+§2 demo first)
+## JOBDASH-006 §3 SHIPPED (2026-07-16) — Gmail outcome → visible status chips
 
-Per the ticket's phasing: **§3** Gmail outcome chip (harden existing classify→proposal loop; optional
-gmail-mcp-source behind ENABLE_GMAIL_MCP), **§4** rejection analysis (`lib/analysis/rejections.ts`,
-deterministic table + Mac-only LLM narration, "Why roles close" card on /analytics), **§5** market
-recommend (affinity profile + similarity scoring + high-reject exclusion; wire job-search-targeting
-scoring prompt into constants.ts). §5 depends on §4's reject signal. Each is its own gated PR.
+§1+§2 demo OK'd by Pranav same day; §3 built as its own gated commit.
+
+- **Data**: `getScoutJobs` now left-joins `applications` on `promoted_application_id` → every tab row
+  carries `appStatus` (null when unlinked; one query shape for all tabs, type `ScoutJobWithOutcome`).
+- **Discover**: `StatusBadge` (existing chips.tsx component — pure reuse) renders on Applied-tab list
+  rows (meta line, right-aligned) + the detail "on your board" notice. Rejected/Interview/Screening/
+  To-apply etc. all read at a glance from the queue.
+- **Timeline**: status_change entries on `/a/[id]` get a compact StatusBadge, derived by EXACT match
+  of the title shapes our own writers produce — manual ("Moved to X" / "Added to pipeline — X"),
+  email sync ("from → to (email sync)", the §3 case that matters), and posting-check's expiry line —
+  free-text notes can't false-positive.
+- **Loop confirmed**: `scripts/eval-classifier.ts` re-run live — rejection precision 100%, interview
+  100%, digest-as-app zero (16 rule-resolved, 3 LLM calls via claude-cli).
+- **OPTIONAL gmail-mcp-source NOT built (deliberate)**: the claude.ai Gmail MCP connector is only
+  callable from a Claude session, not from the Next runtime — a runtime `EmailSource` on it is
+  architecturally impossible; the real replacement for .gmail-staging sweeps is either in-session MCP
+  sweeps writing to staging (today's documented flow) or Gmail API creds (future). ENABLE_GMAIL_MCP
+  therefore doesn't exist.
+- Gate: tsc 0 · 64/64 vitest · build green · Playwright §3 smoke 6/6 desktop+mobile 0 console/HTTP
+  errors (seeded rejected app + promoted scout row, chips verified in list/detail/timeline, seeds
+  removed) · classifier eval PASS · code-reviewer/qa-runner results in the §3 commit message.
+
+## NEXT — JOBDASH-006 §4 then §5 (separate gated PRs)
+
+**§4** rejection analysis: `lib/analysis/rejections.ts` — over closed=rejected apps aggregate
+ROLE_BUCKET × source × german_req × fit_band → rejection-rate per bucket + "what's getting rejected"
+summary; deterministic table is source of truth, LLM (Mac-only, SYNC_DISABLED-guarded) only narrates;
+surface as "Why roles close" card on /analytics. **§5** market recommend (depends on §4's reject
+signal): `lib/reco/profile.ts` affinity profile from ACTIVE_STATUSES apps, `lib/reco/score.ts`
+similarity 0..100 with §4 high-reject exclusion, "More like your pipeline" sort on Discover + one-line
+why; wire the job-search-targeting scoring prompt into constants.ts SEARCH_SOURCES/SEARCH_QUERIES.
+Scheduled scrape OUT OF SCOPE.
 
 ## PARKED — JOBDASH-004: Apply-Click Lifecycle & Auto-Reconcile (P0 CONFIRMED 2026-07-13)
 

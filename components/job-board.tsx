@@ -31,8 +31,10 @@ import { applyToScoutJob } from "@/lib/actions";
 import { dismissScoutJob, importScoutJobs, restoreScoutJob } from "@/lib/import";
 import { fetchJson } from "@/lib/fetch-json";
 import { fmtRelative } from "@/lib/format";
-import type { ScoutJob } from "@/lib/db/schema";
+import { StatusBadge } from "@/components/chips";
+import type { ScoutJobWithOutcome } from "@/lib/queries";
 
+type ScoutJob = ScoutJobWithOutcome;
 type Tab = "new" | "dismissed" | "promoted";
 
 const TABS: { key: Tab; label: string }[] = [
@@ -138,6 +140,9 @@ function JobRow({
           <span className="truncate">{sourceLabel(job.source)}</span>
           <span aria-hidden>·</span>
           <span className="shrink-0">{job.firstSeen ? fmtRelative(job.firstSeen) : "—"}</span>
+          {job.appStatus && (
+            <StatusBadge status={job.appStatus} size="sm" className="ml-auto shrink-0" />
+          )}
         </span>
       </span>
     </button>
@@ -316,14 +321,17 @@ function JobDetail({
         </dl>
 
         {tab === "promoted" && job.promotedApplicationId && (
-          <div className="mt-4 rounded-xl border border-hairline bg-elevated/60 px-4 py-3 text-[12.5px] text-ink-2">
-            This role is on your board.{" "}
-            <Link
-              href={`/a/${job.promotedApplicationId}`}
-              className="font-medium text-accent-hi hover:underline"
-            >
-              Open the application →
-            </Link>
+          <div className="mt-4 flex flex-wrap items-center gap-2.5 rounded-xl border border-hairline bg-elevated/60 px-4 py-3 text-[12.5px] text-ink-2">
+            {job.appStatus && <StatusBadge status={job.appStatus} size="sm" />}
+            <span>
+              This role is on your board.{" "}
+              <Link
+                href={`/a/${job.promotedApplicationId}`}
+                className="font-medium text-accent-hi hover:underline"
+              >
+                Open the application →
+              </Link>
+            </span>
           </div>
         )}
       </div>

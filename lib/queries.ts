@@ -1,10 +1,10 @@
 import "server-only";
-import { and, count, desc, eq, gte, inArray, ne, sql } from "drizzle-orm";
+import { and, count, desc, eq, getTableColumns, gte, inArray, ne, sql } from "drizzle-orm";
 import { db } from "./db";
 import { activities, applications, emailEvents, proposals, scoutJobs, syncState } from "./db/schema";
 import { ACTIVE_STATUSES, BOARD_COLUMNS, CLOSED_STATUSES } from "./constants";
 import { buildActionQueue } from "./action-queue";
-import type { Activity, Application, Proposal } from "./db/schema";
+import type { Activity, Application, Proposal, ScoutJob } from "./db/schema";
 import type { NavCounts } from "@/components/app-shell";
 
 function scalar(row: { n: number } | undefined): number {
@@ -97,11 +97,20 @@ export interface RecentActivity extends Activity {
   applicationId: string;
 }
 
-/** Scout Inbox rows by triage status, best score first. */
-export async function getScoutJobs(status: "new" | "dismissed" | "promoted") {
+export type ScoutJobWithOutcome = ScoutJob & {
+  /** linked application's live status (promoted rows), else null — JOBDASH-006 §3 */
+  appStatus: string | null;
+};
+
+/** Scout Inbox rows by triage status, best score first. One query shape for
+ * every tab: the application join is simply null when nothing is linked. */
+export async function getScoutJobs(
+  status: "new" | "dismissed" | "promoted",
+): Promise<ScoutJobWithOutcome[]> {
   return db
-    .select()
+    .select({ ...getTableColumns(scoutJobs), appStatus: applications.status })
     .from(scoutJobs)
+    .leftJoin(applications, eq(applications.id, scoutJobs.promotedApplicationId))
     .where(eq(scoutJobs.status, status))
     .orderBy(desc(scoutJobs.score))
     .all();
