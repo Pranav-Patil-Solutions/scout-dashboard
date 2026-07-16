@@ -7,6 +7,9 @@ import {
   TriangleAlert,
 } from "lucide-react";
 import { computeAnalytics } from "@/lib/analytics";
+import { analyzeRejections } from "@/lib/analysis/rejections";
+import { getAllApplications } from "@/lib/queries";
+import { RejectionCard } from "@/components/charts/rejection-card";
 import { StatTile } from "@/components/stat-tile";
 import { ChartCard } from "@/components/charts/chart-card";
 import { FunnelChart } from "@/components/charts/funnel-chart";
@@ -25,7 +28,8 @@ const OUTCOME_LABEL: Record<string, string> = {
 };
 
 export default async function AnalyticsPage() {
-  const a = await computeAnalytics();
+  const [a, apps] = await Promise.all([computeAnalytics(), getAllApplications()]);
+  const rejections = analyzeRejections(apps);
   const days = (v: number | null) => (v == null ? "—" : `${v}d`);
 
   return (
@@ -201,6 +205,11 @@ export default async function AnalyticsPage() {
             data={a.language.map((l) => ({ label: l.group, rate: l.responseRate, sent: l.sent }))}
           />
         </ChartCard>
+
+        {/* JOBDASH-006 §4 — deterministic rejection breakdown + Mac-only narration */}
+        <div className="lg:col-span-2">
+          <RejectionCard analysis={rejections} />
+        </div>
       </div>
     </div>
   );

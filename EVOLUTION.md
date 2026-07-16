@@ -75,6 +75,15 @@ reuse (StatusBadge + one left join + exact-title chip derivation on the timeline
 smoke-locator lesson (a mounted-but-CSS-hidden duplicate detail pane needs `.filter({visible:true})`,
 positional `.first()/.last()` both break across viewports) is folded here for the next Playwright pass.
 
+## 2026-07-16 — JOBDASH-006 §4 (rejection analysis)
+
+24. **No failures this loop** — §4 was pure reuse of established patterns (pure-sibling module per
+delta 17, plain-HTML bars per the Recharts rule, SYNC_DISABLED guard shape, fetchJson client path,
+one aggregator looped over dimension descriptors per §6) and every gate passed first run. One
+deliberate design note worth keeping: the narration LLM gets the table as JSON with a
+numbers-verbatim-only system prompt, and the deterministic summary renders REGARDLESS of narration —
+so a hallucinated number could only ever appear next to the true table, never instead of it.
+
 ## 2026-07-14 — JOBDASH-005 v1.2.1 (keep-best + THE BAR + fetchJson)
 
 ## 2026-07-15 — Discover redesign (job-search surface → premium split master-detail + one-click apply)

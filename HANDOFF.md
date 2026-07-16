@@ -130,16 +130,39 @@ job queue) predates it and now effectively becomes JOBDASH-007 — renumber when
   errors (seeded rejected app + promoted scout row, chips verified in list/detail/timeline, seeds
   removed) · classifier eval PASS · code-reviewer/qa-runner results in the §3 commit message.
 
-## NEXT — JOBDASH-006 §4 then §5 (separate gated PRs)
+## JOBDASH-006 §4 SHIPPED (2026-07-16) — rejection analysis, "Why roles close"
 
-**§4** rejection analysis: `lib/analysis/rejections.ts` — over closed=rejected apps aggregate
-ROLE_BUCKET × source × german_req × fit_band → rejection-rate per bucket + "what's getting rejected"
-summary; deterministic table is source of truth, LLM (Mac-only, SYNC_DISABLED-guarded) only narrates;
-surface as "Why roles close" card on /analytics. **§5** market recommend (depends on §4's reject
-signal): `lib/reco/profile.ts` affinity profile from ACTIVE_STATUSES apps, `lib/reco/score.ts`
-similarity 0..100 with §4 high-reject exclusion, "More like your pipeline" sort on Discover + one-line
-why; wire the job-search-targeting scoring prompt into constants.ts SEARCH_SOURCES/SEARCH_QUERIES.
-Scheduled scrape OUT OF SCOPE.
+- `lib/analysis/rejections.ts` (pure, vitest-covered): ONE aggregator looped over four dimension
+  descriptors (roleBucket × source × german_req × fit_band) per §6 — population = apps with
+  appliedAt OR closed-rejected (historical email-sync rejections count), per-segment rejected/rate,
+  sorted worst-first; deterministic `summary` lines (segments under MIN_SUMMARY_POPULATION=2 stay in
+  the table, out of the summary); **`highRejectRoleBuckets(analysis, {minPopulation:3, minRate:0.75})`
+  is the §5 feedback seam** — role buckets the recommender must exclude.
+- `POST /api/rejection-narrative`: SYNC_DISABLED→501 first; else re-computes the table from the DB and
+  has claude-haiku-4-5 narrate ONLY the handed numbers (system prompt forbids computing/estimating;
+  small-sample honesty rule). 422 when zero rejections.
+- `components/charts/rejection-card.tsx` on /analytics (full-width, after Language outcomes):
+  summary lines + 4 segment groups with plain-HTML rate bars (NOT Recharts, per repo rule) +
+  "Narrate" button via fetchJson.
+- **Anti-fabrication gate (reviewer blocker, fixed):** `verifyNarration` (pure, tested) extracts every
+  numeral from the LLM reply and 502s the narration if any is not in `allowedNarrationNumbers(analysis)`
+  (counts + whole-percent forms) — a hallucinated figure can never render; the deterministic table
+  always does. Payload rows carry pre-formatted `pct` strings so the model needs zero arithmetic.
+- Gate: tsc 0 · 76/76 vitest (§4 aggregator + verifier tests; qa-runner added tie-sort + drifted-
+  germanReq cases) · build green · Playwright smoke 8/8 desktop+mobile 0 console/HTTP errors — the
+  rendered "5 of 12 (42%)" line matches direct DB counts · live narration verified TWICE on the Mac,
+  second run through the verifier (all numerals table-traced) · code-reviewer 1 blocker → fixed as
+  above, re-tested · qa-runner 0 fails.
+
+## NEXT — JOBDASH-006 §5 market recommend (last phase; await OK)
+
+`lib/reco/profile.ts` affinity profile from ACTIVE_STATUSES apps (top ROLE_BUCKETS + recurring title
+keywords + preferred german_req/source + median fit), `lib/reco/score.ts` similarity 0..100 per new
+scout_jobs row (bucket + keyword overlap + language gate + fit), EXCLUDING `highRejectRoleBuckets`
+from §4 (feedback loop closes there). Discover: "More like your pipeline" ranked sort atop Open roles
++ one-line why-recommended. Wire the drafted job-search-targeting scoring prompt into constants.ts
+(SEARCH_SOURCES + SEARCH_QUERIES) so importScoutJobs pulls the right lanes. Scheduled scrape OUT OF
+SCOPE (manual Import stays).
 
 ## PARKED — JOBDASH-004: Apply-Click Lifecycle & Auto-Reconcile (P0 CONFIRMED 2026-07-13)
 
