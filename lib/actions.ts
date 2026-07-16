@@ -123,6 +123,42 @@ export async function createApplication(input: ApplicationInput): Promise<{ id: 
   return { id };
 }
 
+/**
+ * One-click apply from the Discover surface (JOBDASH-004 apply-click seam):
+ * create a tracked application on the board (status `to_apply`) so the role is
+ * captured the moment the user opens the posting. Returns the posting URL so the
+ * caller can open it, and `reused` when the scout job is already on the board
+ * (idempotent — re-applying never duplicates a card). Company/role fall back so
+ * a sparse scrape can never make this throw.
+ */
+export async function applyToScoutJob(
+  scoutJobId: string,
+): Promise<{ id: string; url: string | null; reused: boolean }> {
+  const job = await db.select().from(scoutJobs).where(eq(scoutJobs.id, scoutJobId)).get();
+  if (!job) throw new Error("That role is no longer available.");
+
+  if (job.status === "promoted" && job.promotedApplicationId) {
+    return { id: job.promotedApplicationId, url: job.url ?? null, reused: true };
+  }
+
+  const { id } = await createApplication({
+    company: job.company?.trim() || "Unknown company",
+    roleTitle: job.title?.trim() || "Untitled role",
+    source: job.source || "scraper",
+    status: "to_apply",
+    fitScore: job.score ?? null,
+    germanReq: job.languageFlag || "unknown",
+    applyUrl: job.url ?? null,
+    jdUrl: job.url ?? null, // kit generator's resolveJd reads this (JOBDASH-006 §2)
+    notes: job.reason ?? null,
+    isKitReady: false,
+    scoutJobId: job.id,
+  });
+  await logActivity(id, "note", "Apply clicked — posting opened", "scraper");
+
+  return { id, url: job.url ?? null, reused: false };
+}
+
 export async function updateApplication(
   id: string,
   input: ApplicationInput,

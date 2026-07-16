@@ -16,6 +16,24 @@ describe("htmlToText", () => {
     const text = htmlToText("<ul><li>Ops &amp; AI</li><li>B2B</li></ul><p>Berlin&nbsp;&gt;</p>");
     expect(text).toBe("Ops & AI\nB2B\n\nBerlin >");
   });
+
+  it("decodes numeric decimal and hex entities", () => {
+    expect(htmlToText("Caf&#233; &#x2014; Berlin")).toBe("Café — Berlin");
+  });
+
+  it("decodes named entities from the German-posting map", () => {
+    expect(htmlToText("Gr&uuml;&szlig;e aus M&uuml;nchen &mdash; K&ouml;ln")).toBe(
+      "Grüße aus München — Köln",
+    );
+  });
+
+  it("leaves unknown named entities untouched", () => {
+    expect(htmlToText("Tom &amp; Jerry &foobar;")).toBe("Tom & Jerry &foobar;");
+  });
+
+  it("ignores numeric entities above the valid Unicode code point range", () => {
+    expect(htmlToText("&#1114112; &#xFFFFFF;")).toBe("&#1114112; &#xFFFFFF;");
+  });
 });
 
 describe("clampText", () => {

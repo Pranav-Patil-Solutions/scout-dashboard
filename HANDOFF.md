@@ -44,7 +44,75 @@ User ask (DONE): fix Safari "string did not match the expected pattern" on Regen
 - **Open (needs Pranav):** `git push` (now 9+ commits ahead) so prod/phone at scout-dashboard-nine-ruby get the fix. **Honest gap:** end-to-end keep-best live run blocked AGAIN by the CLI session window (scratchpad studio-run5.json = `session limit · resets 10:30pm Berlin`, zero rounds) — logic is code-complete + gate-green but the 2-round regression not re-observed live; run one Kit Studio build after 22:30 Berlin to confirm restore + below-bar demote.
 - **NOT wired (deliberate, out of ticket scope):** `components/proposal-review.tsx` + `components/check-postings-button.tsx` still use raw `res.json()` — same Safari exposure on the sync/postings paths; fold into a future pass if it recurs there.
 
-## NEXT — JOBDASH-004: Apply-Click Lifecycle & Auto-Reconcile (P0 CONFIRMED 2026-07-13, start here after /clear)
+## DISCOVER redesign SHIPPED (2026-07-15) — job-search surface reimagined as a premium apply portal
+
+Pranav asked to "actually apply for jobs in an easy way" and to redesign the job-search segment
+against real job boards. `/triage` ("Scout Inbox") is now **Discover** ("Find your next role") — a
+LinkedIn/Otta-style **split master-detail**: fit-ranked list (score chip + company/role + source +
+language dot) on the left, rich detail on the right (conic score ring, Strong/Stretch pill, "Why you
+match" accent panel from `reason`, 2×2 fact grid). Design decisions were user-chosen via a
+question with layout previews: **split master-detail** + **Apply = open posting + auto-track**.
+
+- **One-click apply**: `applyToScoutJob(scoutJobId)` in `lib/actions.ts` — opens the posting AND
+  creates a tracked `to_apply` application by delegating to `createApplication` (reuses promotion +
+  activity trail + scout-job linkage; idempotent `reused` path when already on the board). This is
+  the JOBDASH-004 apply-click seam, landed early.
+- **Files**: `components/job-board.tsx` (new, replaces deleted `components/triage.tsx`),
+  `app/triage/page.tsx` (rewritten header + JobBoard), `components/app-shell.tsx` (nav "Scout Inbox"
+  → "Discover", icon `Inbox`→`Compass`; href/chord `G I`/badge unchanged). Tabs relabelled
+  new→**Open roles** · promoted→**Applied** · dismissed→**Passed**. Client filters: search + fit
+  pills (All/Strong/Stretch+) + English-first toggle. Keyboard: j/k move · a/Enter apply · x pass.
+- **Gotcha fixed (EVOLUTION delta 21)**: side detail panel must be `max-h`+inner-scroll, never fixed
+  `h-[100dvh-…]`, or the Apply CTA drops below the fold. Verified desktop/mobile/empty via Playwright.
+- **Data note**: Turso (the live DB) currently has 0 `new` scout_jobs (all promoted) → Discover "Open
+  roles" reads empty until an `Import from scout` (Mac-only, needs `JOBSCRAPER_DB_PATH`). The local
+  `scoutdash.db` has 6 `new` rows and was used for screenshot verification.
+- Gate: tsc 0 · 53/53 tests · `next build` green · 3312 prod restarted. Committed 2026-07-16 together
+  with JOBDASH-006 §1+§2 (left uncommitted here — see EVOLUTION delta 22).
+
+## JOBDASH-006 §1+§2 SHIPPED (2026-07-16) — landing = apply queue, JD in the detail pane
+
+Operative ticket = **"Closed-Loop Apply Engine"** (land → apply → outcome → recommend), given in-session
+2026-07-16. ⚠️ Numbering collision: the untracked draft `docs/JOBDASH-006-hybrid-worker.md` (Mac-worker
+job queue) predates it and now effectively becomes JOBDASH-007 — renumber when it's picked up.
+
+- **§1 landing**: `/` server-redirects (307) to `/triage` (`app/page.tsx`); Command Center moved intact
+  to `app/command/page.tsx`; nav + `G C` chord → `/command` (app-shell.tsx). proxy.ts untouched.
+- **§2 schema**: `scout_jobs.jd_text` TEXT null + `jd_fetched_at` ts — `drizzle/0004_jd-cache.sql`,
+  applied to BOTH Turso and the local file DB. Fresh restore-verified Turso backup taken first via new
+  `scripts/backup-turso.ts` (no turso CLI on this Mac; dump is `scoutdash.db.turso-dump-*.sql`, gitignored).
+- **§2 route**: `POST /api/scout-jd/[id]` — cached jd_text short-circuits; else `fetchJobDescription(url)`
+  → cache → `{ok,text,cached}`. 404 (row gone) / 422 (no url) / 502 (unfetchable posting) all return human
+  messages. Pure fetch — runs on Vercel, deliberately NOT behind SYNC_DISABLED.
+- **§2 UI**: `JdPanel` in job-board.tsx JobDetail (all tabs), under "Why you match": cached text → pre-wrap
+  panel with own `max-h-[38dvh]` scroll + "fetched Xh ago" stamp; else "Load description" (fetchJson +
+  useTransition + skeleton). "Copy" → clipboard + "JD copied" toast (clipboard failure → human message).
+  Plain "Open posting" anchor added beside the gradient Apply CTA (new tab only).
+- **§2 kit seam**: `applyToScoutJob` now writes `jdUrl` on the created application → `lib/kit/generate.ts::
+  resolveJd` picks the posting up with zero kit-side changes.
+- **htmlToText upgrade** (shared with the kit pipeline): decodes numeric (`&#252;`/`&#x2013;`) + common
+  named entities (umlauts, ß, dashes, quotes, €…); unknown entities pass through; out-of-range numerics
+  can't throw. Golden fixtures in `lib/kit/__tests__/jd-golden.test.ts` (greenhouse-style page, German
+  posting, br/table handling, 12k clamp).
+- **Known behavior**: a dead-but-HTTP-200 Ashby posting would cache its tombstone text as the JD (jd fetch
+  doesn't consult posting-verdict). Acceptable v1 — the text honestly says the job is gone; wire
+  `posting-verdict` into the route if it annoys.
+- Gate: tsc 0 · 59/59 vitest · `next build` green · Playwright smoke 28/28 desktop+mobile with 0 console/
+  network errors (ERR_ABORTED prefetch aborts filtered — delta 22) incl. full JD loop against a local
+  fixture posting (load → entities decoded → copy → clipboard verified → cache hit on revisit, DB row
+  stamped) · route 404/422/502 curl-verified · code-reviewer 0 BLOCKERS (2 of 3 nits fixed same-session:
+  http(s)-only scheme guard in fetchJobDescription + Uint8Array blobs in backup-turso; 3rd accepted, see
+  Open items) · qa-runner 0 fails, 64/64 after its 4 entity tests + the scheme-guard test.
+
+## NEXT — JOBDASH-006 §3/§4/§5 (await Pranav's OK on §1+§2 demo first)
+
+Per the ticket's phasing: **§3** Gmail outcome chip (harden existing classify→proposal loop; optional
+gmail-mcp-source behind ENABLE_GMAIL_MCP), **§4** rejection analysis (`lib/analysis/rejections.ts`,
+deterministic table + Mac-only LLM narration, "Why roles close" card on /analytics), **§5** market
+recommend (affinity profile + similarity scoring + high-reject exclusion; wire job-search-targeting
+scoring prompt into constants.ts). §5 depends on §4's reject signal. Each is its own gated PR.
+
+## PARKED — JOBDASH-004: Apply-Click Lifecycle & Auto-Reconcile (P0 CONFIRMED 2026-07-13)
 
 **Spec = source of truth: `docs/JOBDASH-004-apply-lifecycle.md`** — full config, 10-transition
 table, integration seams, gated P1–P5 plan. Renumbered from the ticket's "003" (taken by the
@@ -115,7 +183,7 @@ GUARDS: never run destructive SQL against Turso without a fresh scoutdash.db bac
 
 ## Open items (non-blocking)
 
-- Ship-gate nits accepted as known: match.ts short-name containment (≥3 chars) can over-match; `claude -p` SIGKILL doesn't reap grandchildren; concurrent double-sync isn't locked.
+- Ship-gate nits accepted as known: match.ts short-name containment (≥3 chars) can over-match; `claude -p` SIGKILL doesn't reap grandchildren; concurrent double-sync isn't locked; `applyToScoutJob` check-then-act isn't transactional (a sub-second double-click can double-insert; UI disables the button while pending — wrap in db.transaction if it ever bites).
 - Future: Gmail API source (replace .gmail-staging manual sweeps).
 
 ## GOTCHAS
@@ -134,9 +202,13 @@ GUARDS: never run destructive SQL against Turso without a fresh scoutdash.db bac
 
 ```
 app/globals.css                 design tokens (Aurora Signal + chart ramp)
-app/page.tsx                    Command Center
-app/pipeline/ applications/ analytics/ scout/   the 4 other pages
+app/page.tsx                    redirect → /triage (JOBDASH-006 §1)
+app/command/page.tsx            Command Center (nav · G C)
+app/triage/page.tsx             Discover (landing surface) + components/job-board.tsx
+app/pipeline/ analytics/ inbox-sync/ studio/   the other pages
 app/api/sync/route.ts           POST sync endpoint
+app/api/scout-jd/[id]/route.ts  POST JD fetch+cache (jd_text/jd_fetched_at)
+scripts/backup-turso.ts         remote DB dump → replayable .sql (run before Turso migrations)
 lib/constants.ts                status/board/source/role-bucket/fit metadata
 lib/action-queue.ts             alert engine (4 types + snooze)
 lib/analytics.ts                all analytics computation

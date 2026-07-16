@@ -7,6 +7,10 @@ const UA =
 const MAX_JD_CHARS = 12_000;
 
 export async function fetchJobDescription(url: string): Promise<string> {
+  // Stored/user-entered URLs are fetched server-side — never follow non-web schemes.
+  const protocol = new URL(url).protocol;
+  if (protocol !== "http:" && protocol !== "https:")
+    throw new Error(`JD fetch refused: ${protocol} URL`);
   const res = await fetch(url, {
     headers: { "user-agent": UA, accept: "text/html" },
     redirect: "follow",

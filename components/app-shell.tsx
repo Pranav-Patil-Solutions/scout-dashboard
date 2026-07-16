@@ -6,7 +6,7 @@ import { useEffect, useRef, useState, type ComponentType } from "react";
 import {
   BarChart3,
   Columns3,
-  Inbox,
+  Compass,
   LayoutDashboard,
   type LucideProps,
   MailCheck,
@@ -42,10 +42,10 @@ type NavItem = {
 };
 
 const NAV: NavItem[] = [
-  { href: "/", label: "Command", icon: LayoutDashboard, badgeKey: "actions", chord: "G C" },
+  { href: "/command", label: "Command", icon: LayoutDashboard, badgeKey: "actions", chord: "G C" },
   { href: "/pipeline", label: "Board", icon: Columns3, badgeKey: "active", chord: "G P" },
   { href: "/analytics", label: "Insights", icon: BarChart3, chord: "G A" },
-  { href: "/triage", label: "Scout Inbox", icon: Inbox, badgeKey: "triage", chord: "G I" },
+  { href: "/triage", label: "Discover", icon: Compass, badgeKey: "triage", chord: "G I" },
   { href: "/inbox-sync", label: "Email Sync", icon: MailCheck, badgeKey: "proposals", chord: "G E" },
   { href: "/studio", label: "Kit Studio", icon: Wand2, chord: "G S" },
 ];
@@ -193,7 +193,7 @@ export function AppShell({
   // G C command · G P board · G A insights · G I scout inbox · G E email sync.
   useEffect(() => {
     const CHORD_WINDOW_MS = 1200;
-    const chordTargets: Record<string, string> = { c: "/", p: "/pipeline", a: "/analytics", i: "/triage", e: "/inbox-sync", s: "/studio" };
+    const chordTargets: Record<string, string> = { c: "/command", p: "/pipeline", a: "/analytics", i: "/triage", e: "/inbox-sync", s: "/studio" };
     function onKey(e: KeyboardEvent) {
       if (e.metaKey || e.ctrlKey || e.altKey || isTypingTarget(e.target)) return;
       const key = e.key.toLowerCase();

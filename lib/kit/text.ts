@@ -1,5 +1,14 @@
 /** Pure text helpers for the kit generator (JOBDASH-005) — unit-tested. */
 
+// Named entities common in real (esp. German) job postings. &amp;/&lt;/&gt;/
+// &quot;/&apos; are handled separately below, deliberately after these.
+const NAMED_ENTITIES: Record<string, string> = {
+  uuml: "ü", auml: "ä", ouml: "ö", Uuml: "Ü", Auml: "Ä", Ouml: "Ö", szlig: "ß",
+  eacute: "é", egrave: "è", agrave: "à", ccedil: "ç",
+  mdash: "—", ndash: "–", rsquo: "’", lsquo: "‘", rdquo: "”", ldquo: "“",
+  hellip: "…", middot: "·", bull: "•", euro: "€", copy: "©", reg: "®", trade: "™",
+};
+
 /** Visible text of an HTML page: scripts/styles/comments stripped, blocks → newlines. */
 export function htmlToText(html: string): string {
   return html
@@ -10,6 +19,13 @@ export function htmlToText(html: string): string {
     .replace(/<\/(p|div|li|h[1-6]|tr|section|article|ul|ol)>/gi, "\n")
     .replace(/<[^>]+>/g, " ")
     .replace(/&nbsp;/gi, " ")
+    .replace(/&#(\d+);/g, (m, n) =>
+      Number(n) <= 0x10ffff ? String.fromCodePoint(Number(n)) : m,
+    )
+    .replace(/&#x([0-9a-f]+);/gi, (m, n) =>
+      parseInt(n, 16) <= 0x10ffff ? String.fromCodePoint(parseInt(n, 16)) : m,
+    )
+    .replace(/&([a-zA-Z]+);/g, (m, name: string) => NAMED_ENTITIES[name] ?? m)
     .replace(/&amp;/gi, "&")
     .replace(/&lt;/gi, "<")
     .replace(/&gt;/gi, ">")
