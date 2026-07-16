@@ -155,3 +155,62 @@ export const FOLLOWUP_SILENT_DAYS = 10;
 
 /** Categorical chart ramp (identity) — mirrors --chart-1..5. Validator-passed (dark, both surfaces). */
 export const CHART_CATEGORICAL = ["#7c6bf5", "#0fa39a", "#c98317", "#d4557c", "#5b8def"];
+
+/* ==========================================================================
+   JOBDASH-006 §5 — the search lanes the jobscraper should trawl. Canonical
+   config from Pranav's job-search targeting (2026-07-13, widened to
+   global-remote): the scraper repo reads these; importScoutJobs() then pulls
+   whatever it wrote. Scheduled scraping is deliberately out of scope.
+   ========================================================================== */
+
+export const SEARCH_SOURCES: { key: string; label: string; url: string; lane: "global-remote" | "berlin-local" }[] = [
+  { key: "yc-waas", label: "YC Work at a Startup", url: "https://www.workatastartup.com/jobs?remote=true", lane: "global-remote" },
+  { key: "wellfound", label: "Wellfound (remote)", url: "https://wellfound.com/jobs", lane: "global-remote" },
+  { key: "himalayas", label: "Himalayas", url: "https://himalayas.app/jobs", lane: "global-remote" },
+  { key: "remoteok", label: "RemoteOK", url: "https://remoteok.com", lane: "global-remote" },
+  { key: "startup-jobs", label: "startup.jobs (remote)", url: "https://startup.jobs/remote-jobs", lane: "global-remote" },
+  { key: "builtin", label: "Built In (remote)", url: "https://builtin.com/jobs/remote", lane: "global-remote" },
+  { key: "linkedin", label: "LinkedIn (remote)", url: "https://www.linkedin.com/jobs", lane: "global-remote" },
+  { key: "topstartups", label: "topstartups.io", url: "https://topstartups.io/jobs", lane: "global-remote" },
+  { key: "englishjobs-de", label: "englishjobs.de", url: "https://englishjobs.de", lane: "berlin-local" },
+  { key: "hisignal", label: "Hisignal", url: "https://hisignal.io", lane: "berlin-local" },
+  { key: "berlin-startup-jobs", label: "Berlin Startup Jobs", url: "https://berlinstartupjobs.com", lane: "berlin-local" },
+  { key: "ashby-berlin", label: "Ashby boards (Berlin)", url: "https://jobs.ashbyhq.com", lane: "berlin-local" },
+];
+
+/** Target titles — the AI×Ops overlap zone plus startup-generalist lanes. */
+export const SEARCH_QUERIES: string[] = [
+  "AI Operations",
+  "AI Automation Lead",
+  "AI Automation Specialist",
+  "Operations & Automation",
+  "AI Enablement",
+  "Agent Manager",
+  "AI Program Manager",
+  "Founders Associate",
+  "Chief of Staff",
+  "Founder's Office",
+  "Business Operations",
+  "Operations Associate",
+];
+
+/**
+ * Tiered scoring prompt for the scraper's LLM pass (drafted 2026-07-13, wired
+ * here per §5). Gates first, rubric second; output = one JSON object per
+ * posting matching the scout_jobs shape importScoutJobs() expects.
+ */
+export const SCOUT_SCORING_PROMPT = `You score one job posting for Pranav Patil — "AI Operations & Automation Builder": 5 yrs procurement/supply-chain/production ops (SAP MM, Lean, Six Sigma) + hands-on AI/full-stack building (agent fleets, LLM pipelines, Next.js products). Berlin-based, German permit, CET; German language level A2 only.
+
+HARD GATES — evaluate in order; any failure caps score at 25 and the reason must name the failed gate:
+G1 ENGLISH-FIRST: working language must be English. German-mandatory (fluent/native/C1+) fails. "German is a plus" passes.
+G2 STARTUP/SCALEUP: roughly Seed–Series C startups or scaleups. Corporations, agencies, staffing firms, universities fail.
+G3 REACHABLE: fully-remote (global or EU-inclusive) OR on-site/hybrid with relocation + visa sponsorship OR Berlin-local.
+
+RUBRIC (gates passed → score 40..100):
++ core AI×Ops overlap (AI Operations / AI Automation / AI Enablement / Agent Ops / AI Program Mgmt): 85–100
++ startup-generalist (Founders Associate, Chief of Staff, Founder's Office, BizOps): 70–90
++ classic ops with automation surface (Operations Associate/Manager with tooling/AI mentions): 55–80
+− pure engineer/developer/SWE/ML/data-engineer titles, or functional-specialist (…Marketing/…Sales): score ≤ 30 (proven rejecters)
+
+OUTPUT — exactly one JSON object, no prose:
+{"source":"<board key>","title":"<posting title>","company":"<company>","url":"<canonical posting url>","score":<0-100 integer>,"reason":"<one sentence: strongest match signal or the failed gate>","language":"en|bonus|de_en|de"}`;

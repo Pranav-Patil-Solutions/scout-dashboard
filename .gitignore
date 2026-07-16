@@ -7,3 +7,4 @@ scoutdash.db*
 
 # generated application kits (local documents)
 kits/
+tsconfig.tsbuildinfo

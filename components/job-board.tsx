@@ -33,6 +33,7 @@ import { fetchJson } from "@/lib/fetch-json";
 import { fmtRelative } from "@/lib/format";
 import { StatusBadge } from "@/components/chips";
 import type { ScoutJobWithOutcome } from "@/lib/queries";
+import type { Recommendation } from "@/lib/reco/score";
 
 type ScoutJob = ScoutJobWithOutcome;
 type Tab = "new" | "dismissed" | "promoted";
@@ -241,6 +242,7 @@ function JobDetail({
   job,
   tab,
   pending,
+  reco,
   onApply,
   onDismiss,
   onRestore,
@@ -248,6 +250,7 @@ function JobDetail({
   job: ScoutJob;
   tab: Tab;
   pending: boolean;
+  reco?: Recommendation;
   onApply: (job: ScoutJob) => void;
   onDismiss: (job: ScoutJob) => void;
   onRestore: (job: ScoutJob) => void;
@@ -308,6 +311,26 @@ function JobDetail({
         ) : (
           <p className="text-[13px] text-ink-3">
             No match rationale on this role yet — open the posting to review it.
+          </p>
+        )}
+
+        {/* §5 — one-line "why recommended" (or why this lane is paused) */}
+        {reco && (
+          <p
+            className={cn(
+              "mt-3 flex items-start gap-2 rounded-lg border px-3 py-2 text-[12px] leading-relaxed",
+              reco.excluded
+                ? "border-[#fbb03b40] bg-[#fbb03b12] text-[#fbb03b]"
+                : "border-hairline bg-white/[0.02] text-ink-2",
+            )}
+          >
+            <Telescope className="mt-0.5 size-3.5 shrink-0" />
+            <span>
+              {!reco.excluded && (
+                <span className="tnum font-semibold text-foreground">{reco.score} · </span>
+              )}
+              {reco.why}
+            </span>
           </p>
         )}
 
@@ -430,10 +453,13 @@ export function JobBoard({
   jobs,
   tab,
   counts,
+  reco,
 }: {
   jobs: ScoutJob[];
   tab: Tab;
   counts: Record<Tab, number>;
+  /** §5 — per-job similarity ranking; present only when the profile has data */
+  reco?: Record<string, Recommendation>;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -659,6 +685,12 @@ export function JobBoard({
             </div>
 
             <div className="overflow-hidden rounded-2xl border border-hairline bg-card">
+              {reco && (
+                <div className="flex items-center gap-2 border-b border-hairline px-4 py-2 text-[11px] text-ink-3">
+                  <Telescope className="size-3.5 text-accent-hi" />
+                  More like your pipeline — ranked by similarity to your active applications
+                </div>
+              )}
               <div className="max-h-[64dvh] overflow-y-auto lg:max-h-[calc(100dvh-232px)]">
                 {filtered.length === 0 ? (
                   <NoMatch onClear={() => { setQuery(""); setFit("all"); setEnglishOnly(false); }} />
@@ -697,6 +729,7 @@ export function JobBoard({
                   job={selected}
                   tab={tab}
                   pending={pending}
+                  reco={reco?.[selected.id]}
                   onApply={apply}
                   onDismiss={dismiss}
                   onRestore={restore}
@@ -728,6 +761,7 @@ export function JobBoard({
               job={selected}
               tab={tab}
               pending={pending}
+              reco={reco?.[selected.id]}
               onApply={apply}
               onDismiss={dismiss}
               onRestore={restore}

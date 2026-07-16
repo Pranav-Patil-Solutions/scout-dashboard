@@ -75,6 +75,18 @@ reuse (StatusBadge + one left join + exact-title chip derivation on the timeline
 smoke-locator lesson (a mounted-but-CSS-hidden duplicate detail pane needs `.filter({visible:true})`,
 positional `.first()/.last()` both break across viewports) is folded here for the next Playwright pass.
 
+## 2026-07-16 — JOBDASH-006 §5 (market recommend — ticket complete)
+
+25. **No new failures; one reusable lesson re-confirmed and one made explicit.** (a) The §3 smoke
+lesson (delta 23: mounted-but-hidden duplicate detail panes break positional locators) bit AGAIN in
+the §5 smoke script — a stray overlay-opening pre-click made row clicks land under the mobile overlay;
+the fix was removing the speculative click, but the durable rule is: in this app's tests, NEVER click
+"the first matching button" — click the specific row, then assert with `.filter({ visible: true })`.
+(b) Made the §4→§5 feedback contract explicit in code: excluded lanes are ranked LAST with an amber
+"Paused" why-line instead of being filtered out — silent exclusion would read as "the scout found
+nothing", which is the same honesty failure as silent truncation. Feature-complete ticket: landing →
+JD → apply → Gmail outcome → rejection analysis → recommendation, every phase gated.
+
 ## 2026-07-16 — JOBDASH-006 §4 (rejection analysis)
 
 24. **No failures this loop** — §4 was pure reuse of established patterns (pure-sibling module per

@@ -154,15 +154,37 @@ job queue) predates it and now effectively becomes JOBDASH-007 — renumber when
   second run through the verifier (all numerals table-traced) · code-reviewer 1 blocker → fixed as
   above, re-tested · qa-runner 0 fails.
 
-## NEXT — JOBDASH-006 §5 market recommend (last phase; await OK)
+## JOBDASH-006 §5 SHIPPED (2026-07-16) — market recommend, "More like your pipeline"
 
-`lib/reco/profile.ts` affinity profile from ACTIVE_STATUSES apps (top ROLE_BUCKETS + recurring title
-keywords + preferred german_req/source + median fit), `lib/reco/score.ts` similarity 0..100 per new
-scout_jobs row (bucket + keyword overlap + language gate + fit), EXCLUDING `highRejectRoleBuckets`
-from §4 (feedback loop closes there). Discover: "More like your pipeline" ranked sort atop Open roles
-+ one-line why-recommended. Wire the drafted job-search-targeting scoring prompt into constants.ts
-(SEARCH_SOURCES + SEARCH_QUERIES) so importScoutJobs pulls the right lanes. Scheduled scrape OUT OF
-SCOPE (manual Import stays).
+CLOSES THE TICKET: land → apply → outcome → recommend all live.
+
+- `lib/reco/profile.ts` (pure): `buildAffinityProfile(apps)` counts ACTIVE_STATUSES apps → bucket
+  shares (desc), recurring title keywords (tokenized, gender-markers/stopwords stripped, ≥2×, top 12),
+  german/source distributions, medianFit. `titleTokens` exported/shared with scoring.
+- `lib/reco/score.ts` (pure, ONE fn per §6): `scoreScoutJob(job, profile, excludeBuckets)` → 0..100:
+  bucket 40 (normalized to the profile's top lane) + keywords 25 (≤3 matches) + language 20
+  (none 20 / bonus 18 / unknown 10 / de_en 6 / native 0) + fit 15 (falls back to medianFit). §4's
+  `highRejectRoleBuckets` → `excluded: true` + "Paused — … keeps ending in rejection" why-line;
+  excluded rows RANK LAST, never hidden.
+- Discover wiring (`app/triage/page.tsx`): Open-roles tab only, and only when profile sample ≥3 —
+  jobs sorted excluded-last → reco desc → fit desc; header copy switches; JobBoard gets `reco` map;
+  detail shows "score · why" line (amber Paused variant), list gets a "More like your pipeline" strip.
+- `lib/constants.ts`: SEARCH_SOURCES (8 global-remote + 4 Berlin-local boards), SEARCH_QUERIES
+  (12 AI×Ops + generalist titles), SCOUT_SCORING_PROMPT (G1 English / G2 startup / G3 reachable
+  gates + rubric, emits scout_jobs-shaped JSON) — canonical scraper config per job-search targeting;
+  importScoutJobs untouched (scraper repo stays read-only; scheduled scrape out of scope).
+- Gate: tsc 0 · 86/86 vitest (10 golden reco tests) · build green · Playwright smoke 8/8
+  desktop+mobile 0 console/HTTP errors, live why-line "80 · Matches your FA / CoS lane · shares
+  “associate” · English-first · fit 79" · reviewers: see commit message.
+
+## NEXT — JOBDASH-006 complete; open follow-ups
+
+- `git push` (Pranav's call — main is 13+ commits ahead; push = prod deploy on Vercel).
+- Point the jobscraper at constants.ts SEARCH_SOURCES/SEARCH_QUERIES/SCOUT_SCORING_PROMPT, then
+  `Import from scout` — Turso currently has 0 `new` rows, so Discover's ranked queue is empty until
+  a real import lands.
+- Parked: JOBDASH-004 lifecycle/reconcile (spec `docs/JOBDASH-004-apply-lifecycle.md`), the
+  hybrid Mac-worker queue draft (`docs/JOBDASH-006-hybrid-worker.md` — renumber to 007).
 
 ## PARKED — JOBDASH-004: Apply-Click Lifecycle & Auto-Reconcile (P0 CONFIRMED 2026-07-13)
 
