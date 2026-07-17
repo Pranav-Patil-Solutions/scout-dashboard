@@ -145,6 +145,7 @@ export async function importScoutJobs(): Promise<ImportResult> {
       }
     });
 
+    revalidatePath("/triage", "page");
     revalidatePath("/", "layout");
     return { ok: true, imported, updated, total: rows.length };
   } catch (err) {
@@ -159,12 +160,12 @@ export async function importScoutJobs(): Promise<ImportResult> {
 
 export async function dismissScoutJob(id: string): Promise<{ ok: true }> {
   await db.update(scoutJobs).set({ status: "dismissed" }).where(eq(scoutJobs.id, id)).run();
-  revalidatePath("/", "layout");
+  revalidatePath("/triage", "page");
   return { ok: true };
 }
 
 export async function restoreScoutJob(id: string): Promise<{ ok: true }> {
   await db.update(scoutJobs).set({ status: "new" }).where(eq(scoutJobs.id, id)).run();
-  revalidatePath("/", "layout");
+  revalidatePath("/triage", "page");
   return { ok: true };
 }

@@ -12,7 +12,9 @@ const APPLIED_STATUSES = ["applied", "screening", "interview", "offer"];
 const RESPONSE_STATUSES = ["screening", "interview", "offer"];
 
 function revalidateAll() {
-  // Everything derives from the DB and the root layout is dynamic — invalidate the tree.
+  // Invalidate the triage page specifically to ensure scout job list updates
+  revalidatePath("/triage", "page");
+  // Also invalidate the layout for any other pages that might depend on this data
   revalidatePath("/", "layout");
 }
 

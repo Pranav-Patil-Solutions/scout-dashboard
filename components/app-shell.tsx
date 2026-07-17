@@ -42,10 +42,10 @@ type NavItem = {
 };
 
 const NAV: NavItem[] = [
+  { href: "/triage", label: "Discover", icon: Compass, badgeKey: "triage", chord: "G I" },
   { href: "/command", label: "Command", icon: LayoutDashboard, badgeKey: "actions", chord: "G C" },
   { href: "/pipeline", label: "Board", icon: Columns3, badgeKey: "active", chord: "G P" },
   { href: "/analytics", label: "Insights", icon: BarChart3, chord: "G A" },
-  { href: "/triage", label: "Discover", icon: Compass, badgeKey: "triage", chord: "G I" },
   { href: "/inbox-sync", label: "Email Sync", icon: MailCheck, badgeKey: "proposals", chord: "G E" },
   { href: "/studio", label: "Kit Studio", icon: Wand2, chord: "G S" },
 ];
