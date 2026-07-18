@@ -3,13 +3,24 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { ArrowUpRight, ClipboardPaste, FileText, Inbox, Loader2, Wand2 } from "lucide-react";
+import {
+  ArrowUpRight,
+  ClipboardPaste,
+  Download,
+  FileText,
+  Inbox,
+  Loader2,
+  MapPin,
+  Wallet,
+  Wand2,
+} from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { fetchJson } from "@/lib/fetch-json";
 import { gradeTone, type KitGrade } from "@/lib/kit/grade-schema";
 import { FitChip } from "@/components/chips";
 import type { ScoutJob } from "@/lib/db/schema";
+import type { JobMeta } from "@/lib/scrape/job-meta";
 
 /** Kit Studio form + run state (JOBDASH-005 v1.2). One long request; the
  * server loops generate→grade→refine, ~4–9 min depending on rounds. */
@@ -35,6 +46,11 @@ export function StudioForm({ jobs }: { jobs: ScoutJob[] }) {
   const [jd, setJd] = useState("");
   const [applyUrl, setApplyUrl] = useState("");
   const [target, setTarget] = useState(80);
+  const [scraping, setScraping] = useState(false);
+  const [scraped, setScraped] = useState<Pick<
+    JobMeta,
+    "location" | "salary" | "remote"
+  > | null>(null);
   const [running, setRunning] = useState(false);
   const [elapsed, setElapsed] = useState(0);
   const [result, setResult] = useState<StudioResponse | null>(null);
@@ -79,6 +95,44 @@ export function StudioForm({ jobs }: { jobs: ScoutJob[] }) {
       toast.error(err instanceof Error ? err.message : "Studio run failed.");
     } finally {
       setRunning(false);
+    }
+  }
+
+  /** Free meta scraper — paste a posting URL, auto-fill the form from JSON-LD/OG. */
+  async function scrapeMeta() {
+    const url = applyUrl.trim();
+    if (!url || scraping) return;
+    setScraping(true);
+    try {
+      const body = await fetchJson<{ ok: boolean; error?: string; meta?: JobMeta }>(
+        "/api/scrape-meta",
+        {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ url }),
+        },
+      );
+      if (!body.ok || !body.meta) throw new Error(body.error ?? "Couldn't read that posting.");
+      const m = body.meta;
+      if (m.company) setCompany(m.company);
+      if (m.title) setRoleTitle(m.title);
+      if (m.description) setJd(m.description);
+      setScraped({ location: m.location, salary: m.salary, remote: m.remote });
+      const filled = [
+        m.company && "company",
+        m.title && "role",
+        m.description && "description",
+      ].filter(Boolean);
+      if (filled.length)
+        toast.success(`Filled ${filled.join(", ")} from the posting`, {
+          description: [m.location, m.salary].filter(Boolean).join(" · ") || undefined,
+        });
+      else
+        toast.warning("Fetched, but found little structured data — paste the JD text below.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Scrape failed.");
+    } finally {
+      setScraping(false);
     }
   }
 
@@ -157,13 +211,55 @@ export function StudioForm({ jobs }: { jobs: ScoutJob[] }) {
           <div className="grid gap-2.5 sm:grid-cols-2">
             <StudioInput label="Company" value={company} onChange={setCompany} placeholder="e.g. Tacto" />
             <StudioInput label="Role title" value={roleTitle} onChange={setRoleTitle} placeholder="e.g. Chief of Staff" />
-            <StudioInput
-              label="Posting URL (optional)"
-              value={applyUrl}
-              onChange={setApplyUrl}
-              placeholder="https://…"
-              className="sm:col-span-2"
-            />
+            <div className="sm:col-span-2">
+              <span className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-ink-3">
+                Posting URL (optional)
+              </span>
+              <div className="flex gap-2">
+                <input
+                  value={applyUrl}
+                  onChange={(e) => setApplyUrl(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      void scrapeMeta();
+                    }
+                  }}
+                  placeholder="https://… paste a job link and hit Fetch"
+                  className="h-9 min-w-0 flex-1 rounded-xl border border-hairline bg-white/[0.02] px-3 text-[13px] text-foreground placeholder:text-ink-3 focus:border-white/20 focus:outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={() => void scrapeMeta()}
+                  disabled={!applyUrl.trim() || scraping}
+                  className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-xl border border-hairline px-3 text-[12px] font-semibold text-ink-2 transition-colors hover:border-white/15 hover:text-foreground disabled:opacity-50"
+                  title="Auto-fill company, role and JD from the posting"
+                >
+                  {scraping ? (
+                    <>
+                      <Loader2 className="size-3.5 animate-spin" /> Reading…
+                    </>
+                  ) : (
+                    <>
+                      <Download className="size-3.5" /> Fetch
+                    </>
+                  )}
+                </button>
+              </div>
+              {scraped && (scraped.location || scraped.salary || scraped.remote) && (
+                <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                  {scraped.remote && (
+                    <MetaChip icon={<MapPin className="size-3" />}>Remote</MetaChip>
+                  )}
+                  {scraped.location && (
+                    <MetaChip icon={<MapPin className="size-3" />}>{scraped.location}</MetaChip>
+                  )}
+                  {scraped.salary && (
+                    <MetaChip icon={<Wallet className="size-3" />}>{scraped.salary}</MetaChip>
+                  )}
+                </div>
+              )}
+            </div>
             <label className="sm:col-span-2">
               <span className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-ink-3">
                 Job description (paste the full text)
@@ -325,6 +421,14 @@ function StudioInput({
         className="h-9 w-full rounded-xl border border-hairline bg-white/[0.02] px-3 text-[13px] text-foreground placeholder:text-ink-3 focus:border-white/20 focus:outline-none"
       />
     </label>
+  );
+}
+
+function MetaChip({ icon, children }: { icon: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full border border-hairline bg-white/[0.02] px-2 py-0.5 text-[11px] font-medium text-ink-2">
+      {icon} {children}
+    </span>
   );
 }
 
