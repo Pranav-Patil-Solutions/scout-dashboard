@@ -102,7 +102,7 @@ export const scoutJobs = sqliteTable("scout_jobs", {
   reason: text("reason"),
   languageFlag: text("language_flag"),
   firstSeen: integer("first_seen", { mode: "timestamp" }),
-  status: text("status").notNull().default("new"), // new | dismissed | promoted
+  status: text("status").notNull().default("new"), // new | dismissed | promoted | expired (JOBDASH-007 sweep — hidden everywhere, purgeable)
   promotedApplicationId: text("promoted_application_id"),
   jdText: text("jd_text"), // JOBDASH-006 §2 — cached plain-text JD from `url`
   jdFetchedAt: integer("jd_fetched_at", { mode: "timestamp" }),

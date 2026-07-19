@@ -126,3 +126,14 @@ chips. No LLM, no paid API — genuinely free. Gate: tsc 0, 101/101 tests (12 ne
 postings (title/company/remote/salary all correct, $0 gone). **Honest gap:** structured `location` stays null
 when a board keeps location only in prose (A.Team/Remotive) — `remote` is still captured; a prose-location
 heuristic was deliberately left out as scope creep.
+
+27. **A route's `maxDuration` is a budget your own arithmetic must respect — and `next dev` dirties `next-env.d.ts`.**
+JOBDASH-007's first cut swept the whole `new` queue (189 rows) at concurrency 6 with a 12s probe timeout:
+worst case ≈ 396s against the route's own `maxDuration = 300` — Vercel would hard-kill mid-request, losing the
+in-flight batch and the response. Caught by the zero-context ship-gate reviewer, not by tests (the gate suite has
+no wall-clock model). → Delta: whenever a handler loops over an unbounded row set doing network IO, do the
+worst-case math (rows/concurrency × timeout) against `maxDuration` IN THE CODE COMMENT, and cap the run
+(`MAX_PER_RUN` slice) with a persisted rotating cursor so repeat runs cover the tail — never assume "it'll be
+faster in practice". Second catch, same review: running `next dev` rewrites `next-env.d.ts` to reference
+`.next/dev/types/routes.d.ts`, which only exists after a dev run — committing it breaks tsc on any fresh
+clone/CI. `git checkout -- next-env.d.ts` before every commit in this repo (dev server used for live verify).

@@ -6,6 +6,7 @@ import { analyzeRejections, highRejectRoleBuckets } from "@/lib/analysis/rejecti
 import { buildAffinityProfile } from "@/lib/reco/profile";
 import { scoreScoutJob, type Recommendation } from "@/lib/reco/score";
 import { JobBoard } from "@/components/job-board";
+import { ScoutSweep } from "@/components/scout-sweep";
 
 type Tab = "new" | "dismissed" | "promoted";
 
@@ -20,7 +21,7 @@ export default async function DiscoverPage({
   const { tab: rawTab } = await searchParams;
   const tab: Tab = rawTab === "dismissed" || rawTab === "promoted" ? rawTab : "new";
 
-  const [jobs, counts] = await Promise.all([
+  const [jobs, counts, expiredCount] = await Promise.all([
     getScoutJobs(tab),
     (async () =>
       Object.fromEntries(
@@ -31,6 +32,9 @@ export default async function DiscoverPage({
           ]),
         ),
       ) as Record<Tab, number>)(),
+    (async () =>
+      (await db.select({ n: count() }).from(scoutJobs).where(eq(scoutJobs.status, "expired")).get())
+        ?.n ?? 0)(),
   ]);
 
   // JOBDASH-006 §5 — "More like your pipeline": rank Open roles by similarity
@@ -53,16 +57,19 @@ export default async function DiscoverPage({
 
   return (
     <div className="mx-auto max-w-[1240px] px-4 py-6 md:px-6 md:py-8">
-      <header className="mb-6">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-ink-3">Discover</p>
-        <h1 className="mt-1 text-2xl font-semibold tracking-tight text-foreground">
-          Find your next role
-        </h1>
-        <p className="mt-1.5 text-[13.5px] text-ink-2">
-          {reco
-            ? "Open roles ranked by how closely they match your live pipeline — open one, read why, apply in a click."
-            : "Roles your scout surfaced, ranked by fit. Open one, read why it matches, and apply in a click."}
-        </p>
+      <header className="mb-6 flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-ink-3">Discover</p>
+          <h1 className="mt-1 text-2xl font-semibold tracking-tight text-foreground">
+            Find your next role
+          </h1>
+          <p className="mt-1.5 text-[13.5px] text-ink-2">
+            {reco
+              ? "Open roles ranked by how closely they match your live pipeline — open one, read why, apply in a click."
+              : "Roles your scout surfaced, ranked by fit. Open one, read why it matches, and apply in a click."}
+          </p>
+        </div>
+        <ScoutSweep expiredCount={expiredCount} />
       </header>
 
       <JobBoard jobs={jobs} tab={tab} counts={counts} reco={reco} />
