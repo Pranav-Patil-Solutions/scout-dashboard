@@ -49,11 +49,18 @@ function toDate(raw: unknown): Date | null {
 export async function importScoutJobs(): Promise<ImportResult> {
   const raw = process.env.JOBSCRAPER_DB_PATH;
   if (!raw) {
-    return { ok: false, error: "JOBSCRAPER_DB_PATH is not set in .env." };
+    return {
+      ok: false,
+      error:
+        "Import runs on the Mac dashboard (localhost:3312) — the scraper database lives on its disk. There, JOBSCRAPER_DB_PATH is set in .env.local.",
+    };
   }
   const dbPath = path.isAbsolute(raw) ? raw : path.join(process.cwd(), raw);
   if (!fs.existsSync(dbPath)) {
-    return { ok: false, error: `Scraper DB not found at ${dbPath}. Check JOBSCRAPER_DB_PATH in .env.` };
+    return {
+      ok: false,
+      error: `Scraper DB not found at ${dbPath}. Check JOBSCRAPER_DB_PATH in .env.local.`,
+    };
   }
 
   let scraper: Client | null = null;
