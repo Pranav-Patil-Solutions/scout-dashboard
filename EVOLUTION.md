@@ -137,3 +137,12 @@ worst-case math (rows/concurrency × timeout) against `maxDuration` IN THE CODE 
 faster in practice". Second catch, same review: running `next dev` rewrites `next-env.d.ts` to reference
 `.next/dev/types/routes.d.ts`, which only exists after a dev run — committing it breaks tsc on any fresh
 clone/CI. `git checkout -- next-env.d.ts` before every commit in this repo (dev server used for live verify).
+
+28. **An "env var not set" error from a long-lived server means STALE PROCESS before missing config.**
+The Mac LAN server on 3312 had been running detached since Jul 16 — its process env predated the
+.env.local JOBSCRAPER_DB_PATH fix (Jul 17) and its build predated /api/import entirely, so the dashboard
+showed "JOBSCRAPER_DB_PATH is not set in .env." even though every env file on disk was correct. → Delta:
+(a) when diagnosing config errors, check the serving process's start time against the config's mtime FIRST
+(`ps -o lstart -p $(lsof -ti :3312)`); (b) shipping anything in this repo now ends with rebuild + detached
+restart of 3312 (`nohup npx next start -H 0.0.0.0 -p 3312 > ~/Library/Logs/scout-dashboard-3312.log 2>&1 &`)
+— a committed fix the running server doesn't serve is not shipped.
