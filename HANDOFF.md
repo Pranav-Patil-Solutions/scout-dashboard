@@ -295,3 +295,91 @@ docs/gmail-fetch-spec.md        Gmail MCP fetch queries
 ```
 
 Original tickets (JOBDASH-001, JOBDASH-002) are in the prior session transcript; the specs' operative constraints are all reflected above.
+
+---
+
+# NEXT — JOBDASH-009: sync daily-emailed jobs into "To apply"
+
+> Written 2026-07-22 at a context handoff. Everything in "Context" below is DONE and
+> committed; only "Build" remains. Start a fresh session and read this section first.
+
+## Context — what just shipped (do not redo)
+
+Relevancy was rebuilt across both repos and committed:
+- `~/scout-dashboard` — commit `53f228c` on branch **`feat/jobdash-008-relevancy-gates`**
+  (branched off `main`; NOT pushed, no PR yet).
+- `~/Downloads/pranav-essentials/D--vyaparwerk/jobscraper` — commit `aaee227`.
+  **This repo had no git until now**; it was `git init`-ed. No remote. `.env` is
+  correctly gitignored (real Gmail app password lives there).
+
+The scraper is now three stages: `gates.py` (G0 real posting / G1 English-first /
+G2 startup / G3 reachable — a failure caps the score at 25 and names the gate in
+`reason`), `scoring.py` (keyword recall), `llm_rank.py` (`claude -p` precision,
+degrades to keyword score on any failure). `rescore_db.py` re-scores the stored
+corpus — **run it after any scoring change**, or `jobs.db` drifts into a mix of
+old and new scores. `jobs.db` now persists the JD (`description` column).
+Tests: `pytest test_relevancy.py` 77/77; dashboard `npx vitest run` 106/106; tsc 0.
+
+## Decisions already made by Pranav (2026-07-22) — do not re-ask
+
+1. **Only strong fits auto-add.** Score **≥ 75** goes into `to_apply`. Everything
+   else stays in Discover for manual triage. Rationale: the daily email now carries
+   11–15 jobs; auto-adding all of them is ~90 cards/week and makes the board
+   meaningless.
+2. **The daily run moves to the Mac** (launchd/cron), not GitHub Actions. Actions
+   has no `claude` CLI, so it would silently skip the LLM ranking stage every day.
+
+## Build
+
+### A. Scraper — make "emailed" explicit
+`seen_jobs` is currently the de-facto emailed log (`mark_seen` is called only for
+the emailed top-N, and only on a real send — never on `--dry-run`). That is
+implicit and its name says "dedupe". Add an explicit column instead:
+- `models.py init_db()`: additive migration `ALTER TABLE jobs ADD COLUMN emailed_at TEXT`
+  (follow the existing `PRAGMA table_info` pattern used for `description`).
+- `models.py`: `mark_emailed(job)` setting `emailed_at` to UTC ISO now.
+- `main.py`: call it for each job in `top` in the real-send branch ONLY. `--dry-run`
+  must never mark (that would silently promote jobs during testing).
+
+### B. Dashboard — import + auto-promote
+- `lib/db/schema.ts`: add `emailedAt` (integer timestamp) to `scoutJobs`.
+  Then `npm run db:generate` and `npm run db:migrate`.
+- `lib/import.ts` `importScoutJobs()`: read `emailed_at` from the scraper DB
+  (guard with `PRAGMA table_info` — the column may not exist yet on an old DB,
+  the existing code is already defensive this way) and persist it.
+- New `lib/scout-autosync.ts`: for every scout job with `emailedAt != null`,
+  `status === "new"`, and `score >= 75`, call the EXISTING
+  `applyToScoutJob(id)` from `lib/actions.ts`. **Reuse it — do not write a second
+  promote path.** It already claims the row atomically (`ne(status,"promoted")`),
+  is idempotent on double-apply, creates the application with `status: "to_apply"`,
+  and logs an activity. Bulk version should collect results and return
+  `{ promoted, skipped, reused }` for the toast.
+- Call the autosync right after a successful import (same place the import toast
+  is raised), and log one activity line per promoted card so the board shows
+  provenance ("Auto-added from the daily scout email").
+- Use `GATE_FAIL_CAP` / `gateFailure()` from `lib/constants.ts` as a belt-and-braces
+  guard: never auto-promote a row whose `reason` carries a "⛔ Gn" marker, even if
+  a stale score somehow reads ≥ 75.
+
+### C. Daily run on the Mac
+- launchd plist (or `cron`) running `main.py` daily ~08:00 Berlin from the venv at
+  `.venv`, logging to `~/Library/Logs/jobscraper-daily.log`.
+- Must `cd` to the repo (relative `DB_PATH = "jobs.db"`) and load `.env`.
+- Disable/remove `.github/workflows/daily.yml` so the two do not double-send.
+
+### D. Gate before calling it done
+`pytest test_relevancy.py`, `npx vitest run`, `npx tsc --noEmit`, then
+`python main.py --dry-run` and confirm **no** row gained `emailed_at`.
+Ship gate per the standing rule: `code-reviewer` then `qa-runner`, zero blockers.
+Then rebuild + detached restart of 3312 (EVOLUTION delta 28 — a committed fix the
+running server does not serve is not shipped).
+
+## Known-open, unrelated to this ticket
+- Discover still serves the **old 198 prod rows**; re-import after a scrape.
+- German ads with no stored JD still rank (`everphone "AI Operations Lead (w/m/d)"`
+  84.2, S-Markt, IW Medien). They gate automatically once re-scraped with a JD.
+  `GERMAN_MARKER_STRICT = False` in `config.py` is the deliberate switch — turning
+  it on gated lemon.markets' real English Berlin role, see EVOLUTION delta 32.
+- `ECCO Select, "Kansas City Metropolitan Area"` slips G3: LinkedIn's
+  "X Metropolitan Area" format carries no state code to match.
+- Neither repo is pushed. scout-dashboard has an origin; jobscraper has no remote.
