@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { buildAffinityProfile, titleTokens } from "../reco/profile";
 import { RECO_WEIGHTS, scoreScoutJob } from "../reco/score";
+import { gateFailure } from "../constants";
 import type { Application } from "../db/schema";
 
 /** Minimal app factory — only fields the profile reads. */
@@ -151,5 +152,60 @@ describe("scoreScoutJob (golden)", () => {
     // bucket 0 · keywords 0 · language 20 · fit clamped to 0 → 0 = 20; raw -50 < 75 so no fit clause
     expect(under.score).toBe(20);
     expect(under.why).toBe("Matches English-first");
+  });
+
+  // 2026-07-21: the scraper now enforces hard gates (G0..G3) and prefixes a
+  // gated job's reason with "⛔ Gn …". The affinity profile is title-driven, so
+  // without this a perfectly-titled but corporate/unreachable role would top
+  // Discover — exactly the "AI Operations Lead @ Ericsson" case.
+  it("excludes a job the scraper gated, however well its title matches", () => {
+    const rec = scoreScoutJob(
+      {
+        title: "AI Operations Associate",
+        languageFlag: "none",
+        source: "ashby",
+        score: 25,
+        reason: "⛔ G2 STARTUP/SCALEUP: enterprise/corporate employer (Ericsson)",
+      },
+      p,
+    );
+    expect(rec.excluded).toBe(true);
+    expect(rec.why).toBe("Ruled out by your scout — failed G2 STARTUP/SCALEUP.");
+  });
+
+  it("leaves an ungated job recommendable even when its score is low", () => {
+    const rec = scoreScoutJob(
+      {
+        title: "AI Operations Associate",
+        languageFlag: "none",
+        source: "ashby",
+        score: 25,
+        reason: "partial match on ops keywords",
+      },
+      p,
+    );
+    expect(rec.excluded).toBe(false);
+  });
+
+  it("treats a missing reason as ungated (rows imported before gating existed)", () => {
+    const rec = scoreScoutJob(
+      { title: "AI Operations Associate", languageFlag: "none", source: "ashby", score: 82 },
+      p,
+    );
+    expect(rec.excluded).toBe(false);
+  });
+});
+
+describe("gateFailure", () => {
+  it("extracts the gate name from a scraper reason", () => {
+    expect(gateFailure("⛔ G3 REACHABLE: located outside reachable range ('india')")).toBe(
+      "G3 REACHABLE",
+    );
+  });
+
+  it("returns null for an ungated reason and for empty input", () => {
+    expect(gateFailure("strong role match in title; English-friendly")).toBeNull();
+    expect(gateFailure(null)).toBeNull();
+    expect(gateFailure(undefined)).toBeNull();
   });
 });

@@ -146,3 +146,98 @@ showed "JOBSCRAPER_DB_PATH is not set in .env." even though every env file on di
 (`ps -o lstart -p $(lsof -ti :3312)`); (b) shipping anything in this repo now ends with rebuild + detached
 restart of 3312 (`nohup npx next start -H 0.0.0.0 -p 3312 > ~/Library/Logs/scout-dashboard-3312.log 2>&1 &`)
 — a committed fix the running server doesn't serve is not shipped.
+
+29. **A scoring rubric where every signal only ADDS cannot rank — and a scraper that writes the query into the result will always top its own ranking.**
+The jobscraper's relevancy had two independent structural faults, both invisible until the live 198-job corpus was
+replayed. (a) `yc_hiring.py` set `title = f"{term} (HN hiring post)"` and `company = <HN username>`, so `_role_fit`
+matched the very search term that produced the row and returned 100/100 — 20 of the top 25 jobs were HN handles
+(`guitarmartini`, `mike_hearn`), and HN averaged 83.0 against LinkedIn's 65.2 purely from this self-fulfilling loop.
+(b) Weights were role 40 / seniority 20 / language 20 / stage 20, so 60% of the score measured "is this a normal
+English startup job" — every posting floated to a ~55-60 floor, the corpus compressed into 80-90, and the
+`title_mismatch_flags` cap on the 40%-weighted role_fit component was too weak to bite ("Senior DevOps Engineer" @
+Lemon.io scored 84). Meanwhile the G1/G2/G3 gates existed ONLY as prose inside `SCOUT_SCORING_PROMPT` in this repo's
+`lib/constants.ts` — a constant **no code imports** — so nothing enforced them: Ericsson/Swisscom/Mphasis sat in the
+80s and the #1 ranked job was in Bengaluru. → **Deltas:** (1) A disqualifier must be a GATE in code, not a negative
+weight — anything expressible as "never show me this" gets a hard cap plus the gate name in the reason, so a wrong
+rule is auditable instead of invisible. (2) A rubric constant that documents behaviour in ANOTHER repo must say so in
+its docstring and name the mirrored files, or it silently becomes fiction — `SCOUT_SCORING_PROMPT` now does. (3) Never
+let a scraper populate a scored field from its own query; assert it, which `gates.py` G0 now does as defence in depth.
+(4) Always replay the real corpus before/after a ranking change — every one of these was found by diffing the top 25,
+not by reading code. **Self-inflicted catch worth keeping:** the first cut of G0 also gated "title == one of our
+search terms" as an echo, which suppressed `Founders Associate @ Kuro Technology` (Berlin) and two real Chief of Staff
+roles — *the best matches in the corpus*. Search terms ARE real job titles; a heuristic that punishes a result for
+matching its query inverts the ranking. Caught only by auditing gate failures for false positives, which is now a
+mandatory step whenever a filter is added. (5) `"intern" in txt` also matches "international" — an English-friendly
+signal was applying an entry-level penalty; word-boundary regexes for all short substring flags.
+Gate: pytest 39/39 (new suite), vitest 106/106, tsc 0, 198-job replay verified.
+
+30. **An LLM stage layered on top of a rules stage will silently overwrite the rules unless policy is re-applied after it — and `breakdown` is a numeric contract.**
+Three catches from the JOBDASH relevancy ship gate, all invisible to the unit suite that existed at the time.
+(a) `llm_rank.py` replaces `job.score` outright, so every deterministic down-weight computed in `scoring.py` was
+discarded the moment the LLM ranked a job — the live dry run returned "Founders Associate Intern" at **78**, above
+real full-level roles, because the model weighed the title match over the entry-level signal. → Delta: split
+*policy* from *ranking*. Hard gates and non-negotiable down-weights are policy and get re-applied to whatever the
+model returns (`apply_policy_multipliers()`, called by BOTH stages); the LLM ranks WITHIN policy and never overrules
+it. Any time a model's output replaces a computed value, ask what invariants that computation was carrying.
+(b) The LLM's language verdict was stashed in `job.breakdown["llm_language"]` as a string, but `mailer.py` renders
+every breakdown value with `:.0f` — the entire `--dry-run` crashed at render, *after* a full scrape and 5 LLM calls.
+→ Delta: a dict consumed by a formatter is a typed contract; new fields of a different type get their own attribute,
+and end-to-end dry runs are mandatory because the unit suite never touched the renderer.
+(c) Zero-context reviewer caught bare `"coo"` in `senior_overshoot_flags` matching inside `"coordinator"`/`"coordinate"`,
+costing ops-titled roles 25 seniority points — the *third* instance of the substring trap in one session (after
+`intern`/`international` and the search-term echo). → Delta: in this codebase a keyword flag list is guilty until
+proven innocent — every short flag is matched with `\b…\b`, and adding a new flag list means adding a false-positive
+test in the same commit. Gate: pytest 47/47, vitest 106/106, tsc 0, live `--dry-run` clean end to end.
+
+31. **A two-letter code that means two different places is not a default to pick — it is an ambiguity to resolve.**
+The ship gate's QA pass found `DE` in `_US_STATE_SUFFIX` (Delaware) silently gating every `"Berlin, DE"` /
+`"Munich, DE"` posting as US-located — the single worst failure this scraper can produce, since Berlin roles are the
+target. The obvious fix (read `DE` as Germany) was also wrong, and the live corpus proved it within one run:
+"Senior AI & Automation Specialist @ The Bancorp, **Wilmington, DE**" — a Delaware bank — jumped from gated to #6.
+Same collision for `MT` (Malta / Montana). → **Delta:** when a token is genuinely ambiguous, neither default is
+acceptable; resolve it with corroborating evidence in the same field (`"Berlin, DE"` → a European city confirms
+Germany; `"Wilmington, DE"` → nothing European, so Delaware) and write the test for BOTH readings. Picking a default
+just moves the bug to the other side and makes it harder to see. **Second-order catch from the same fix:** the
+`_EU_TOKENS` allowlist was missing half the EU/EEA (Malta, Luxembourg, Greece, Hungary, Croatia, the Baltics,
+Norway…), so those countries were unreachable purely because nobody had listed them — an allowlist is a silent
+denylist for everything absent from it, so enumerate the full set or don't use one.
+Ship gate this session: zero-context reviewer (1 blocker + 3 warns, all fixed) then qa-runner (6 failures exposing 3
+real bugs, all fixed) → pytest 68/68, vitest 106/106, tsc 0, live `--dry-run` clean.
+
+32. **A filter that fires on missing data is not strict — it is broken. Distinguish "evidence of X" from "no evidence of not-X".**
+Asked to make English mandatory, the first cut treated a German gender marker — "(m/w/d)" / "(f/m/d)" — as evidence
+the posting was German, gated unless the JD proved otherwise. It gated **lemon.markets' "Founder's Associate
+(f/m/d)"**, an English-speaking Berlin startup role and one of the best matches in the corpus, purely because its
+staged JD was too thin to verify. German employment law (AGG) puts that marker on German-market ads *in any
+language*: it means "employer is in Germany", not "job is in German". The rule was scoring the absence of data, and
+across the stored corpus it cut passing rows from 100 to 73 while catching almost no actual German. → **Delta:** gate
+on POSITIVE evidence (German function words/umlauts in the title, or a German JD), never on a legal formality plus
+missing context; where the strict reading is still wanted, make it a named config flag with the measured cost in its
+comment (`GERMAN_MARKER_STRICT`), not a silent default. **Two supporting deltas from the same session:** (a) `jobs.db`
+never stored the JD, so any stored row was permanently unjudgeable on language and unrescoreable by the LLM —
+persist the inputs a scorer needs, or "re-score" can only ever re-run the weakest half of the scorer; (b) scores were
+only refreshed when a run happened to re-scrape a row, so after every scoring change the table was a MIX of old and
+new — 40 pre-fix rows still sat above the email threshold, including one at 95. Added `rescore_db.py`; a scoring
+change is not shipped until the existing corpus is re-scored, because every surface reads that table.
+Also fixed: the HN parser read "Who wants to be HIRED?" candidate posts as jobs ("SEEKING WORK | Australia, APAC" at
+70.8) and took the employment-type field as the role ("Mitte (mitte.ai) | Berlin | Full-Time | …" → role "Full-Time").
+Gate: pytest 77/77, live --dry-run clean, 340-row corpus re-scored.
+
+33. **A tracker nobody writes to reports "no problem" in exactly the same way as "no data". Seed it from the system of record before trusting any funnel read.**
+Asked why the job search wasn't converting, the honest first answer should have come from `applications` — the table
+this whole product exists to populate. It had **zero rows**, across a period in which Gmail proved 18 real
+applications had been sent. Nothing in the UI distinguishes "you have applied to nothing" from "you have applied to
+eighteen things and logged none of them", so the dashboard had been silently reporting a healthy empty board while
+the actual funnel ran 18 → 10 rejections → 8 silent → **0 interviews**. The diagnosis had to be reconstructed
+entirely from the inbox, and only then backfilled (`source='gmail-backfill'`, ids `bf-*`). This is the same failure
+class as delta 23 and [[sqlite-db-is-not-one-file]]: **a check whose pass state is indistinguishable from its
+failure state is not a check.** → **Delta:** (a) treat Gmail as the system of record for applications, not the
+board — the confirmation/rejection mail is the event, the row is a cached projection of it, so an empty board must
+be reconciled against the inbox before it is believed; (b) any dashboard tile computed over an empty table must
+render "no data logged" rather than a zero, because a zero reads as a measurement; (c) the funnel read that
+mattered most was not a status count but **time-to-rejection (mean 5.2 days) and the one row that reached screening**
+— surface the shape of the funnel, not just its totals.
+Second-order catch from the same session: **the resume had never once stated work authorisation**, on any of 21
+variants, while the candidate held a permit reading "Erwerbstätigkeit gestattet" — the single cheapest fix in the
+whole pipeline sat outside the tool's scope because the tool models postings and statuses but not the artifact
+being sent. A pipeline that optimises targeting while never inspecting the payload will optimise the wrong half.

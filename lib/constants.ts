@@ -195,22 +195,54 @@ export const SEARCH_QUERIES: string[] = [
 ];
 
 /**
- * Tiered scoring prompt for the scraper's LLM pass (drafted 2026-07-13, wired
- * here per §5). Gates first, rubric second; output = one JSON object per
- * posting matching the scout_jobs shape importScoutJobs() expects.
+ * The scraper's relevancy contract.
+ *
+ * IMPORTANT: this is documentation of a pipeline that runs in the OTHER repo —
+ * no code here calls it. Every score/reason/language_flag in scout_jobs is
+ * produced by the Python jobscraper and read in verbatim by importScoutJobs().
+ * Retuning relevancy means editing the jobscraper, not this file; this constant
+ * exists so the contract is reviewable from the dashboard side.
+ *
+ * Mirrors (keep in sync — drift here caused the 2026-07-21 rebuild):
+ *   jobscraper/gates.py      — G0..G3, enforced in code
+ *   jobscraper/scoring.py    — keyword rubric, the recall stage
+ *   jobscraper/llm_rank.py   — RANK_SYSTEM_PROMPT, the precision stage
+ *
+ * History: from 2026-07-13 to 2026-07-21 the gates below existed ONLY as this
+ * string and nothing enforced them, so corporations (Ericsson, Swisscom) and
+ * non-EU roles (Awign, India) scored in the 80s. They are now real code.
  */
 export const SCOUT_SCORING_PROMPT = `You score one job posting for Pranav Patil — "AI Operations & Automation Builder": 5 yrs procurement/supply-chain/production ops (SAP MM, Lean, Six Sigma) + hands-on AI/full-stack building (agent fleets, LLM pipelines, Next.js products). Berlin-based, German permit, CET; German language level A2 only.
 
 HARD GATES — evaluate in order; any failure caps score at 25 and the reason must name the failed gate:
+G0 REAL POSTING: must be a specific role at an identifiable employer. A title echoing the search query, or a forum handle as the company, fails.
 G1 ENGLISH-FIRST: working language must be English. German-mandatory (fluent/native/C1+) fails. "German is a plus" passes.
-G2 STARTUP/SCALEUP: roughly Seed–Series C startups or scaleups. Corporations, agencies, staffing firms, universities fail.
-G3 REACHABLE: fully-remote (global or EU-inclusive) OR on-site/hybrid with relocation + visa sponsorship OR Berlin-local.
+G2 STARTUP/SCALEUP: roughly Seed–Series C startups or scaleups. Corporations, agencies, staffing firms, talent marketplaces, universities fail.
+G3 REACHABLE: fully-remote (global or EU-inclusive) OR on-site/hybrid in the EU/DACH OR Berlin-local. US/India/LATAM/APAC-located roles fail.
 
-RUBRIC (gates passed → score 40..100):
+RUBRIC (gates passed → score 40..100). Judge what the person would DO all day, not how many keywords appear:
 + core AI×Ops overlap (AI Operations / AI Automation / AI Enablement / Agent Ops / AI Program Mgmt): 85–100
 + startup-generalist (Founders Associate, Chief of Staff, Founder's Office, BizOps): 70–90
 + classic ops with automation surface (Operations Associate/Manager with tooling/AI mentions): 55–80
-− pure engineer/developer/SWE/ML/data-engineer titles, or functional-specialist (…Marketing/…Sales): score ≤ 30 (proven rejecters)
+− the role IS an engineering or specialist post (SWE/ML/data engineer, Marketing, Sales, Recruiting, Design): ≤ 30 (proven rejecters) even when the title also contains "AI" or "Operations"
+− entry-level (Intern / Werkstudent / Trainee): heavily down-weighted — 5 yrs experience makes these a step backwards
 
 OUTPUT — exactly one JSON object, no prose:
 {"source":"<board key>","title":"<posting title>","company":"<company>","url":"<canonical posting url>","score":<0-100 integer>,"reason":"<one sentence: strongest match signal or the failed gate>","language":"en|bonus|de_en|de"}`;
+
+/**
+ * Scores at or below this were capped by a hard gate in the scraper rather than
+ * earned by the rubric. Mirrors GATE_FAIL_CAP in jobscraper/gates.py.
+ */
+export const GATE_FAIL_CAP = 25;
+
+/**
+ * The scraper prefixes a gated job's reason with "⛔ G2 STARTUP/SCALEUP: …".
+ * Returns the gate name, or null when the job passed every gate. Parsing the
+ * reason (rather than inferring from a low score) keeps a genuinely weak-but-
+ * ungated job distinguishable from a suppressed one.
+ */
+export function gateFailure(reason: string | null | undefined): string | null {
+  const match = /⛔\s*(G\d[A-Z\s/-]*)/.exec(reason ?? "");
+  return match ? match[1].trim() : null;
+}

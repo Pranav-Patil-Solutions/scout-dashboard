@@ -1,4 +1,4 @@
-import { roleBucket } from "@/lib/constants";
+import { gateFailure, roleBucket } from "@/lib/constants";
 import { titleTokens, type AffinityProfile } from "./profile";
 
 /**
@@ -13,6 +13,8 @@ export interface ScoutJobLike {
   languageFlag: string | null;
   source: string | null;
   score: number | null;
+  /** The scraper's one-line verdict; carries the "⛔ Gn …" marker when gated. */
+  reason?: string | null;
 }
 
 export interface Recommendation {
@@ -56,6 +58,19 @@ export function scoreScoutJob(
   const fitPts = RECO_WEIGHTS.fit * (clampedFit / 100);
 
   const score = Math.round(bucketPts + keywordPts + languagePts + fitPts);
+
+  // A job the scraper gated (not English-first, corporate, unreachable, or not
+  // a real posting) must never be recommended, however well its title happens
+  // to match the pipeline — the affinity profile is title-driven and would
+  // otherwise happily surface "AI Operations Lead @ Ericsson, London".
+  const gate = gateFailure(job.reason);
+  if (gate) {
+    return {
+      score,
+      excluded: true,
+      why: `Ruled out by your scout — failed ${gate}.`,
+    };
+  }
 
   if (excludeBuckets.includes(bucket.key)) {
     return {
