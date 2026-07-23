@@ -298,6 +298,31 @@ Original tickets (JOBDASH-001, JOBDASH-002) are in the prior session transcript;
 
 ---
 
+# ✅ DONE — JOBDASH-009 (shipped 2026-07-23)
+
+Built and verified live. Dashboard commit `f87eade`, scraper commits `d3f2ad3`
+(emailed_at + mark) and `583e565` (launchd daily automation). Turso migration
+0005 applied. Live proof: To apply went 0 → 4 as strong-fit digest jobs
+auto-added. Scheduler: `~/Library/LaunchAgents/com.pranav.jobscout-daily.plist`
+(08:00 Berlin) → `daily-run.sh` (scrape → POST /api/import → auto-add).
+
+Still open (NOT blockers, deliberately deferred):
+- **Email not sending** — SMTP creds are commented out in the scraper `.env`;
+  board sync is decoupled and works without it. Uncomment SMTP_USER/SMTP_PASS to
+  enable (see scraper README). This was a deliberate design call over a
+  code-review objection — EVOLUTION delta 33.
+- **The expiry watchdog still probes `to_apply` cards** (posting-check.ts:100).
+  The 4 current cards have LinkedIn/Indeed URLs that resolve to unknown/live (not
+  swept), but a future auto-added card with a 404 URL could vanish. A grace
+  period for freshly-created cards would harden this.
+- **G2 enterprise list is incomplete** — "Senior AI Leader @ AbbVie" (a pharma
+  giant) scored 76 and auto-added; AbbVie isn't in gates.py's enterprise set.
+  Relevancy tuning, not an automation bug.
+- **Import into remote Turso is slow (~6 min, per-row round-trips)** — fine for a
+  daily background job (curl -m 600), but batching upserts would help.
+
+--- historical spec below (kept for context) ---
+
 # NEXT — JOBDASH-009: sync daily-emailed jobs into "To apply"
 
 > Written 2026-07-22 at a context handoff. Everything in "Context" below is DONE and
