@@ -106,6 +106,9 @@ export const scoutJobs = sqliteTable("scout_jobs", {
   promotedApplicationId: text("promoted_application_id"),
   jdText: text("jd_text"), // JOBDASH-006 §2 — cached plain-text JD from `url`
   jdFetchedAt: integer("jd_fetched_at", { mode: "timestamp" }),
+  // JOBDASH-009 — set by the scraper when a job makes the daily digest. The
+  // auto-sync promotes emailed strong fits (score ≥ 75) into "To apply".
+  emailedAt: integer("emailed_at", { mode: "timestamp" }),
 });
 
 /* ==========================================================================

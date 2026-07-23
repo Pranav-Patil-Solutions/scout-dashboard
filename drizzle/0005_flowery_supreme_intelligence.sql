@@ -1,0 +1,1 @@
+ALTER TABLE `scout_jobs` ADD `emailed_at` integer;

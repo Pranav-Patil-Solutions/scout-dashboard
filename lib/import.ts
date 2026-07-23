@@ -8,6 +8,7 @@ import { revalidatePath } from "next/cache";
 import { eq } from "drizzle-orm";
 import { db } from "./db";
 import { scoutJobs } from "./db/schema";
+import { autoSyncEmailedJobs } from "./scout-autosync";
 
 export interface ImportResult {
   ok: boolean;
@@ -15,6 +16,9 @@ export interface ImportResult {
   imported?: number;
   updated?: number;
   total?: number;
+  /** JOBDASH-009 — strong-fit digest jobs auto-added to "To apply" this import. */
+  autoApplied?: number;
+  autoAppliedLabels?: string[];
 }
 
 /** en → none · de_en/both → de_en · de/german → native · bonus → bonus */
@@ -120,6 +124,10 @@ export async function importScoutJobs(): Promise<ImportResult> {
           reason: row.reason != null ? String(row.reason) : null,
           languageFlag: mapLanguage(row.language ?? row.language_flag ?? row.german),
           firstSeen: toDate(row.first_seen ?? row.created_at) ?? new Date(),
+          // JOBDASH-009 — the daily-digest marker. May be absent on an older
+          // scraper DB; toDate() returns null for a missing/blank value, which
+          // is exactly "not emailed", so no PRAGMA guard is needed here.
+          emailedAt: toDate(row.emailed_at),
         };
 
         const existing = await tx
@@ -138,6 +146,11 @@ export async function importScoutJobs(): Promise<ImportResult> {
               title: values.title,
               company: values.company,
               source: values.source,
+              // A job is usually emailed on a LATER run than its first import,
+              // so refresh the marker on update — otherwise auto-sync never sees
+              // it. COALESCE-style: only overwrite when the scraper has a value,
+              // so re-importing an older DB can't clear an existing marker.
+              ...(values.emailedAt ? { emailedAt: values.emailedAt } : {}),
             })
             .where(eq(scoutJobs.id, existing.id))
             .run();
@@ -152,9 +165,24 @@ export async function importScoutJobs(): Promise<ImportResult> {
       }
     });
 
+    // JOBDASH-009 — promote the digest's strong fits to "To apply" now that the
+    // fresh emailed_at markers are in. Runs after the import transaction commits
+    // so it sees the just-written rows. A failure here must not fail the import
+    // (the rows are already in), so it is caught and reported as zero.
+    let autoApplied = 0;
+    let autoAppliedLabels: string[] = [];
+    try {
+      const sync = await autoSyncEmailedJobs();
+      autoApplied = sync.promoted;
+      autoAppliedLabels = sync.promotedLabels;
+    } catch (err) {
+      console.error("auto-sync after import failed", err);
+    }
+
     revalidatePath("/triage", "page");
+    revalidatePath("/pipeline", "page");
     revalidatePath("/", "layout");
-    return { ok: true, imported, updated, total: rows.length };
+    return { ok: true, imported, updated, total: rows.length, autoApplied, autoAppliedLabels };
   } catch (err) {
     return {
       ok: false,

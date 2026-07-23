@@ -568,6 +568,12 @@ export function JobBoard({
       const res = await importScoutJobs();
       if (res.ok) {
         toast.success(`Scout import: ${res.imported} new, ${res.updated} refreshed (${res.total} scanned)`);
+        if (res.autoApplied && res.autoApplied > 0) {
+          toast.success(
+            `${res.autoApplied} strong-fit ${res.autoApplied === 1 ? "job" : "jobs"} from your daily digest added to “To apply”.`,
+            { description: res.autoAppliedLabels?.slice(0, 3).join(" · ") },
+          );
+        }
         router.refresh();
       } else {
         toast.error(res.error ?? "Import failed.");

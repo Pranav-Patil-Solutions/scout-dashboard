@@ -241,3 +241,19 @@ Second-order catch from the same session: **the resume had never once stated wor
 variants, while the candidate held a permit reading "Erwerbstätigkeit gestattet" — the single cheapest fix in the
 whole pipeline sat outside the tool's scope because the tool models postings and statuses but not the artifact
 being sent. A pipeline that optimises targeting while never inspecting the payload will optimise the wrong half.
+
+34. **A stored preference only works if it is read at write time. Load the style rules BEFORE generating the artifact, not after rendering it.**
+Rebuilt the CV, rendered it, showed it, and only then noticed ten em-dashes in it. Two mechanisms existed to prevent
+exactly that and neither fired: an explicit rule in memory ("Pranav does not want em-dashes in his resumes, a common
+AI-written tell") and a `humanizer` skill scoped to the very directory the file was written into. Both were consulted
+*after* Pranav pointed at the output. The failure is ordering, not knowledge. → **Delta:** when generating a
+user-facing artifact into a directory that carries scoped skills, load them as part of planning the write, in the
+same step as reading the previous version of the file; treat a directory-scoped skill as a precondition of writing
+there, not as a review tool. Concretely for resumes/cover letters: no em-dashes (en-dashes in ranges are fine), no
+curly quotes, vary bullet structure instead of a uniform `**Label:** text` list, and verify with a character count
+(`em-dash: 0`) before rendering rather than by eye afterwards.
+
+33. **"No new To apply jobs" was TWO bugs wearing one coat — a missing feature and a silent data-decoupling trap. Diagnose the live DB before believing either.**
+Reported symptom: nothing ever appears in the "To apply" column. Querying live Turso (not the local fallback file) settled it in two facts: (a) 0 `to_apply` applications existed, and (b) the auto-add feature that would create them was only SPEC'd in HANDOFF.md, never built — so "no new jobs appear" was literally correct. A second, subtler finding: 8 of 11 past manual applies had been swept to `expired_missed` by the posting-expiry watchdog, which probes exactly `to_apply` cards (posting-check.ts:100) — on seed rows with fabricated URLs that genuinely 404, so a fresh apply could vanish fast. → **Delta:** when a user says "X never shows up", query the ACTUAL serving DB for X's count and X's producers before choosing between "feature missing" and "feature broken" — they demand different fixes and the symptom is identical. Built JOBDASH-009: scraper stamps `emailed_at` on digest picks; dashboard auto-promotes emailed + `new` + score≥75 (gate-marker-guarded) via the EXISTING `applyToScoutJob()` atomic claim — reused, not forked, so a manual apply racing the sync can't double-create. Verified live: to_apply 0→2.
+**The decoupling call, against a code-review blocker:** the reviewer said mark `emailed_at` only on SMTP success. But the user's SMTP creds are commented out — email never sends — so gating board-sync on delivery would make the whole feature silently do nothing, reproducing the exact bug it closes. Kept the decoupling: `emailed_at` means "selected for the daily digest," the board is its own delivery channel (provenance activity + toast make it visible), and a send failure is loud, not swallowed. Documented the deliberate deviation in main.py so the next reviewer doesn't "fix" it back. Reviewer was right on the cheap correct sub-point: naive `utcnow().isoformat()` is parsed as LOCAL by the dashboard's `Date.parse()` — added a "Z" suffix.
+Gate: pytest 77/77, vitest 113/113, tsc 0, live import + board render verified.

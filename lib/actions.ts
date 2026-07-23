@@ -135,7 +135,11 @@ export async function createApplication(input: ApplicationInput): Promise<{ id: 
  */
 export async function applyToScoutJob(
   scoutJobId: string,
+  opts: { note?: string; actor?: string } = {},
 ): Promise<{ id: string; url: string | null; reused: boolean }> {
+  // opts lets the auto-sync (JOBDASH-009) record a different provenance than a
+  // human click while reusing this exact atomic-claim path — do NOT fork it.
+  const { note = "Apply clicked — posting opened", actor = "scraper" } = opts;
   const job = await db.select().from(scoutJobs).where(eq(scoutJobs.id, scoutJobId)).get();
   if (!job) throw new Error("That role is no longer available.");
 
@@ -174,7 +178,7 @@ export async function applyToScoutJob(
     isKitReady: false,
     scoutJobId: job.id,
   });
-  await logActivity(id, "note", "Apply clicked — posting opened", "scraper");
+  await logActivity(id, "note", note, actor);
 
   return { id, url: job.url ?? null, reused: false };
 }
