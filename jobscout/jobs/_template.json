@@ -1,0 +1,31 @@
+{
+  "slug": "company-slug",
+  "company": "Company Name",
+  "role": "Exact Role Title from JD",
+  "location": "Berlin, Germany",
+  "job_url": "https://to.indeed.com/...",
+  "job_id": "JOBSEARCH_000",
+  "status": "to_apply",
+  "notes": "anything worth remembering (deadline, referral, salary)",
+
+  "cv": {
+    "headline": "Optional tailored headline under the name; omit to use profile default",
+    "summary": "Optional tailored sidebar summary aimed at this JD; omit for default",
+    "skills": ["Optional", "reordered skills list", "top items first"],
+    "core_focus": ["Optional", "tailored core-focus list"]
+  },
+
+  "cover_letter": {
+    "headline": "Optional tailored headline line for the letter header",
+    "date": "29 July 2026",
+    "addressee_lines": ["Name or Hiring Team", "Role / Team", "Company, Berlin"],
+    "salutation": "Dear ...,",
+    "paragraphs": [
+      "Opening: why this exact role, tied to how you already work.",
+      "Proof: the shipped builds / operational wins that map to the JD.",
+      "Ownership + change experience.",
+      "Honest note on German A2 / English C1 and where you contribute now.",
+      "Close: ask for the conversation."
+    ]
+  }
+}

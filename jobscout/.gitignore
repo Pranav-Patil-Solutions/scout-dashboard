@@ -1,0 +1,17 @@
+# Personal data — never commit
+contact_local.py
+headshot-circular.png
+applications.csv
+
+# Real job specs (keep only the template public)
+jobs/*.json
+!jobs/_template.json
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# Generated output
+Applications/
+*.docx
