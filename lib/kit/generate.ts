@@ -24,7 +24,7 @@ const MODEL = "claude-sonnet-5";
 // full-document generation regularly outruns the email pipeline's 300s default
 const KIT_CLI_TIMEOUT_MS = 480_000;
 const DEFAULT_BASE_RESUME =
-  "/Users/pranavpatil/Downloads/pranav-essentials/C--Users-Pranav/linkedin-improvement/Pranav-Resume-2026-07-12.html";
+  "/Users/pranavpatil/Downloads/pranav-essentials/C--Users-Pranav/linkedin-improvement/Pranav-Resume-2026-07-22.html";
 
 export function kitDir(appId: string): string {
   return path.join(process.cwd(), "kits", appId);

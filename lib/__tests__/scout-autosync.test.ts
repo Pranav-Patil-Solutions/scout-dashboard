@@ -13,6 +13,9 @@ function candidate(overrides: Partial<AutoApplyCandidate> = {}): AutoApplyCandid
     score: 88,
     reason: "strong role match in title; English-friendly",
     emailedAt: EMAILED,
+    // JOBDASH-010 — every candidate now needs a passing JD-level grade too.
+    // The JOBDASH-009 conditions below are necessary, no longer sufficient.
+    fitGrade: "A",
     ...overrides,
   };
 }
@@ -52,5 +55,13 @@ describe("isAutoApplyEligible", () => {
 
   it("treats a null score as ineligible, not as zero-that-passes", () => {
     expect(isAutoApplyEligible(candidate({ score: null }))).toBe(false);
+  });
+
+  it("JOBDASH-010: the JD-level grade can veto a job that passes every JOBDASH-009 test", () => {
+    // Same row, same 88 title score, same digest — the grade is what changed.
+    expect(isAutoApplyEligible(candidate({ fitGrade: "C" }))).toBe(false);
+    expect(isAutoApplyEligible(candidate({ fitGrade: "F" }))).toBe(false);
+    expect(isAutoApplyEligible(candidate({ fitGrade: null }))).toBe(false);
+    expect(isAutoApplyEligible(candidate({ fitGrade: "B" }))).toBe(true);
   });
 });

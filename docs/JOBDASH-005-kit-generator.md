@@ -10,8 +10,12 @@ canonical base resume and the job's real posting text → files saved locally, `
 
 ## §2 Inputs
 - **Base resume**: `KIT_BASE_RESUME` env, default
-  `~/Downloads/pranav-essentials/C--Users-Pranav/linkedin-improvement/Pranav-Resume-2026-07-12.html`
+  `~/Downloads/pranav-essentials/C--Users-Pranav/linkedin-improvement/Pranav-Resume-2026-07-22.html`
   (canonical per resume-versions memory; self-contained A4-print HTML with `@page` CSS).
+  Repointed 2026-07-22 from the stale `Pranav-Resume-2026-07-12.html`. The 07-22 base carries the
+  work-authorisation header line and live product URLs, so **tailoring must never drop either** —
+  they are the two things the funnel diagnosis identified as missing. Style gate: no em-dashes,
+  no curly quotes, one A4 page (verify by character count and page count, not by eye).
 - **Job description**: fetched live from `jd_url ?? apply_url` (HTML → text, scripts/styles stripped,
   clamped ~12k chars). Fallback: the card's `notes`. No JD source at all → 422.
 - **App fields**: company, role_title, location, german_req.

@@ -34,6 +34,7 @@ import { fmtRelative } from "@/lib/format";
 import { StatusBadge } from "@/components/chips";
 import type { ScoutJobWithOutcome } from "@/lib/queries";
 import type { Recommendation } from "@/lib/reco/score";
+import { gradeTone, isApplyEligible, isFitGrade } from "@/lib/reco/fit-grade";
 
 type ScoutJob = ScoutJobWithOutcome;
 type Tab = "new" | "dismissed" | "promoted";
@@ -92,6 +93,28 @@ function ScoreRing({ score, size = 64 }: { score: number | null | undefined; siz
 }
 
 /* ---- List row ---------------------------------------------------------- */
+/* JOBDASH-010 — the apply-readiness grade, shown wherever a job is triaged so a
+   blocked row explains itself instead of just refusing the Apply click. */
+function FitGradeChip({ grade }: { grade: string | null | undefined }) {
+  if (!isFitGrade(grade)) {
+    return (
+      <span className="shrink-0 rounded px-1 text-[10px] font-semibold text-ink-3 ring-1 ring-hairline/60" title="Not fit-graded yet — cannot enter To apply">
+        —
+      </span>
+    );
+  }
+  const color = gradeTone(grade);
+  return (
+    <span
+      className="shrink-0 rounded px-1 text-[10px] font-semibold"
+      style={{ color, background: `color-mix(in oklab, ${color} 14%, transparent)` }}
+      title={`Fit grade ${grade}${isApplyEligible(grade) ? "" : " — blocked from To apply"}`}
+    >
+      {grade}
+    </span>
+  );
+}
+
 function JobRow({
   job,
   active,
@@ -138,6 +161,7 @@ function JobRow({
         </span>
         <span className="mt-0.5 block truncate text-[12.5px] text-ink-2">{job.title}</span>
         <span className="mt-1 flex items-center gap-1.5 text-[11px] text-ink-3">
+          <FitGradeChip grade={job.fitGrade} />
           <span className="truncate">{sourceLabel(job.source)}</span>
           <span aria-hidden>·</span>
           <span className="shrink-0">{job.firstSeen ? fmtRelative(job.firstSeen) : "—"}</span>

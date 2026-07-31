@@ -9,6 +9,10 @@ import { eq } from "drizzle-orm";
 import { db } from "./db";
 import { scoutJobs } from "./db/schema";
 import { autoSyncEmailedJobs } from "./scout-autosync";
+import { gradeStaleScoutJobs } from "./reco/grade-job";
+
+/** Fit-grade budget per import — see the call site for why it is bounded. */
+const GRADE_PER_IMPORT = 25;
 
 export interface ImportResult {
   ok: boolean;
@@ -19,6 +23,8 @@ export interface ImportResult {
   /** JOBDASH-009 — strong-fit digest jobs auto-added to "To apply" this import. */
   autoApplied?: number;
   autoAppliedLabels?: string[];
+  /** JOBDASH-010 — rows fit-graded during this import. */
+  graded?: number;
 }
 
 /** en → none · de_en/both → de_en · de/german → native · bonus → bonus */
@@ -165,6 +171,19 @@ export async function importScoutJobs(): Promise<ImportResult> {
       }
     });
 
+    // JOBDASH-010 — grade the new/stale rows BEFORE the auto-sync runs, because
+    // the auto-sync now refuses anything ungraded. Bounded per import: grading
+    // is one `claude -p` call per job, and an unbounded sweep on a big scrape
+    // would stall the import for many minutes. The rest are picked up by the
+    // next import or a manual sweep.
+    let gradedThisImport = 0;
+    try {
+      const sweep = await gradeStaleScoutJobs({ limit: GRADE_PER_IMPORT });
+      gradedThisImport = sweep.graded;
+    } catch (err) {
+      console.error("fit-grade sweep after import failed", err);
+    }
+
     // JOBDASH-009 — promote the digest's strong fits to "To apply" now that the
     // fresh emailed_at markers are in. Runs after the import transaction commits
     // so it sees the just-written rows. A failure here must not fail the import
@@ -182,7 +201,15 @@ export async function importScoutJobs(): Promise<ImportResult> {
     revalidatePath("/triage", "page");
     revalidatePath("/pipeline", "page");
     revalidatePath("/", "layout");
-    return { ok: true, imported, updated, total: rows.length, autoApplied, autoAppliedLabels };
+    return {
+      ok: true,
+      imported,
+      updated,
+      total: rows.length,
+      autoApplied,
+      autoAppliedLabels,
+      graded: gradedThisImport,
+    };
   } catch (err) {
     return {
       ok: false,

@@ -6,6 +6,7 @@ import { and, eq, ne } from "drizzle-orm";
 import { db } from "./db";
 import { activities, applications, scoutJobs, type Application } from "./db/schema";
 import { CLOSED_STATUSES, deriveFitBand, statusMeta, type Status } from "./constants";
+import { passesManualApplyGate } from "./scout-autosync-policy";
 import type { ApplicationInput } from "./types";
 
 const APPLIED_STATUSES = ["applied", "screening", "interview", "offer"];
@@ -135,7 +136,7 @@ export async function createApplication(input: ApplicationInput): Promise<{ id: 
  */
 export async function applyToScoutJob(
   scoutJobId: string,
-  opts: { note?: string; actor?: string } = {},
+  opts: { note?: string; actor?: string; override?: boolean } = {},
 ): Promise<{ id: string; url: string | null; reused: boolean }> {
   // opts lets the auto-sync (JOBDASH-009) record a different provenance than a
   // human click while reusing this exact atomic-claim path — do NOT fork it.
@@ -145,6 +146,17 @@ export async function applyToScoutJob(
 
   if (job.status === "promoted" && job.promotedApplicationId) {
     return { id: job.promotedApplicationId, url: job.url ?? null, reused: true };
+  }
+
+  // JOBDASH-010 — the apply gate. Enforced HERE, not only in the auto-sync, so
+  // the manual click cannot walk around it. `override` is the deliberate escape
+  // hatch for "I know, add it anyway", and it is recorded in the activity log.
+  if (!opts.override && !passesManualApplyGate(job.fitGrade)) {
+    throw new Error(
+      job.fitGrade
+        ? `This role grades ${job.fitGrade} — below the apply bar. Re-grade it or add it deliberately.`
+        : "This role has not been fit-graded yet. Grade it before adding it to To apply.",
+    );
   }
 
   // Atomically claim the scout job before creating the application. This
@@ -178,7 +190,14 @@ export async function applyToScoutJob(
     isKitReady: false,
     scoutJobId: job.id,
   });
-  await logActivity(id, "note", note, actor);
+  await logActivity(
+    id,
+    "note",
+    opts.override && job.fitGrade
+      ? `${note} — added over the fit gate (grades ${job.fitGrade})`
+      : note,
+    actor,
+  );
 
   return { id, url: job.url ?? null, reused: false };
 }

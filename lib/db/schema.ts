@@ -109,7 +109,14 @@ export const scoutJobs = sqliteTable("scout_jobs", {
   // JOBDASH-009 — set by the scraper when a job makes the daily digest. The
   // auto-sync promotes emailed strong fits (score ≥ 75) into "To apply".
   emailedAt: integer("emailed_at", { mode: "timestamp" }),
-});
+  // JOBDASH-010 — apply-readiness fit grade, computed from the FULL JD against
+  // the base resume. Null = ungraded, which is never apply-eligible.
+  fitGrade: text("fit_grade"), // A | B | C | D | F
+  fitAssessment: text("fit_assessment", { mode: "json" }), // StoredAssessment
+  gradedAt: integer("graded_at", { mode: "timestamp" }),
+  gradedResumeV: text("graded_resume_v"), // sha256 prefix of the base-resume text
+  gradedFactsV: integer("graded_facts_v"), // HARD_FACTS.version
+}, (t) => [index("scout_fit_grade_idx").on(t.fitGrade)]);
 
 /* ==========================================================================
    JOBDASH-002 — Gmail → status sync engine (§8).
