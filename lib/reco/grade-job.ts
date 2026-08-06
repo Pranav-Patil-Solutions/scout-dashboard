@@ -1,5 +1,5 @@
 import "server-only";
-import { eq, inArray, isNull, or, ne, and } from "drizzle-orm";
+import { eq, inArray, isNull, or, ne, and, desc } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { scoutJobs, type ScoutJob } from "@/lib/db/schema";
 import { claudePrompt } from "@/lib/llm-cli";
@@ -157,6 +157,13 @@ export function isGradeCurrent(
  * Grade every row that needs it: never graded, or graded against a stale resume
  * / stale hard facts. Sequential on purpose — the `claude -p` seam is one
  * subscription, and a parallel fan-out gets rate-limited into failures.
+ *
+ * Ordered by score DESC because the sweep is BOUNDED (25 per import) while the
+ * ungraded backlog is in the hundreds. Unordered, it graded arbitrary rows, so
+ * the ≥75 strong fits — the only ones auto-sync can promote, and the only ones
+ * a human can click Apply on — were never reached: 2026-08-04 had 29 apply-ready
+ * rows and 0 of them graded. Highest-scoring first means every sweep spends its
+ * budget on the rows that can actually become a To-apply card.
  */
 export async function gradeStaleScoutJobs(
   opts: { limit?: number; statuses?: string[] } = {},
@@ -179,6 +186,7 @@ export async function gradeStaleScoutJobs(
         ),
       ),
     )
+    .orderBy(desc(scoutJobs.score))
     .limit(limit)
     .all();
 

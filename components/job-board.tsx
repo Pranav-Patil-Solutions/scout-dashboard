@@ -12,6 +12,7 @@ import {
   ExternalLink,
   FileText,
   Loader2,
+  RefreshCw,
   Search,
   Sparkles,
   Telescope,
@@ -29,6 +30,7 @@ import {
 } from "@/lib/constants";
 import { applyToScoutJob } from "@/lib/actions";
 import { dismissScoutJob, importScoutJobs, restoreScoutJob } from "@/lib/import";
+import { runFullScoutUpdate } from "@/lib/scout-refresh";
 import { fetchJson } from "@/lib/fetch-json";
 import { fmtRelative } from "@/lib/format";
 import { StatusBadge } from "@/components/chips";
@@ -605,6 +607,29 @@ export function JobBoard({
     });
   }
 
+  function runFullUpdate() {
+    const toastId = toast.loading("Scraping fresh listings — this can take a few minutes…");
+    startTransition(async () => {
+      const res = await runFullScoutUpdate();
+      const imp = res.import;
+      if (res.ok && imp) {
+        toast.success(
+          `Update complete: ${imp.imported} new, ${imp.updated} refreshed, ${imp.graded ?? 0} graded`,
+          { id: toastId },
+        );
+        if (imp.autoApplied && imp.autoApplied > 0) {
+          toast.success(
+            `${imp.autoApplied} strong-fit ${imp.autoApplied === 1 ? "job" : "jobs"} from your daily digest added to “To apply”.`,
+            { description: imp.autoAppliedLabels?.slice(0, 3).join(" · ") },
+          );
+        }
+        router.refresh();
+      } else {
+        toast.error(res.error ?? "Update failed.", { id: toastId });
+      }
+    });
+  }
+
   // Keyboard: j/k or ↑/↓ move · a/Enter apply · x pass (Otta-style flow).
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -651,9 +676,19 @@ export function JobBoard({
 
         <button
           type="button"
+          onClick={runFullUpdate}
+          disabled={pending}
+          title="Scrape fresh listings, rank + grade them, then import — the full daily-run pipeline"
+          className="ml-auto inline-flex h-9 items-center gap-1.5 rounded-lg border border-hairline bg-white/[0.02] px-3.5 text-sm font-semibold text-ink-2 transition-colors hover:bg-white/[0.05] disabled:opacity-50"
+        >
+          {pending ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}
+          Update everything
+        </button>
+        <button
+          type="button"
           onClick={runImport}
           disabled={pending}
-          className="ml-auto inline-flex h-9 items-center gap-1.5 rounded-lg border-0 bg-[linear-gradient(135deg,#7c6bf5,#4e7df0)] px-3.5 text-sm font-semibold text-white shadow-[0_0_0_1px_rgba(155,140,255,0.35)] transition-[filter] hover:brightness-110 disabled:opacity-50"
+          className="inline-flex h-9 items-center gap-1.5 rounded-lg border-0 bg-[linear-gradient(135deg,#7c6bf5,#4e7df0)] px-3.5 text-sm font-semibold text-white shadow-[0_0_0_1px_rgba(155,140,255,0.35)] transition-[filter] hover:brightness-110 disabled:opacity-50"
         >
           {pending ? <Loader2 className="size-4 animate-spin" /> : <DownloadCloud className="size-4" />}
           Import from scout
